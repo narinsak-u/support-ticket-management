@@ -6,7 +6,7 @@ export const NOTIFICATION_RECORD_REPOSITORY = Symbol('NOTIFICATION_RECORD_REPOSI
 export interface NotificationRecord {
   id: string;
   ticketId: string;
-  type: 'TICKET_CREATED';
+  type: string;
   message: string;
   createdAt: Date;
 }
