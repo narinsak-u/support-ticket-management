@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request = require('supertest');
@@ -6,6 +7,7 @@ import { HttpErrorFilter } from '../../../common/http-exception.filter';
 import { DetermineTeam } from '../../routing/application/determine-team';
 import { Ticket } from '../domain/ticket';
 import { CreateTicket } from '../application/create-ticket';
+import { CreateTicketDto } from './create-ticket.dto';
 import { TicketController } from './ticket.controller';
 
 describe('POST /api/v1/tickets', () => {
@@ -18,6 +20,8 @@ describe('POST /api/v1/tickets', () => {
       { recordTicketCreated: async (notification) => { recordedNotifications.push(notification); } },
       { error: () => {} },
     );
+    Reflect.defineMetadata('design:paramtypes', [CreateTicketDto], TicketController.prototype, 'create');
+
     const module = await Test.createTestingModule({
       controllers: [TicketController],
       providers: [{ provide: CreateTicket, useValue: createTicket }],
