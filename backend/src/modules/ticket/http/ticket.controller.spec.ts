@@ -6,14 +6,24 @@ import { describe, expect, it } from 'vitest';
 import { HttpErrorFilter } from '../../../common/http-exception.filter';
 import { DetermineTeam } from '../../routing/application/determine-team';
 import { Ticket } from '../domain/ticket';
-import { CreateTicket, GetTicket, ListTickets } from '../application/create-ticket';
+import { CreateTicket, GetTicket, ListTicketQuery, ListTickets, TicketRepository } from '../application/create-ticket';
 import { CreateTicketDto } from './create-ticket.dto';
 import { TicketController } from './ticket.controller';
 
 function createApp() {
   const persisted: Ticket[] = [];
+  const repository: TicketRepository = {
+    save: async (ticket) => { persisted.push(ticket); },
+    list: async ({ status, category, page, limit }: ListTicketQuery) => {
+      const matches = persisted.filter((ticket) =>
+        (!status || ticket.status === status) && (!category || ticket.category === category),
+      ).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id.localeCompare(a.id));
+      return { tickets: matches.slice((page - 1) * limit, page * limit), total: matches.length };
+    },
+    findById: async (id) => persisted.find((ticket) => ticket.id === id),
+  };
   const createTicket = new CreateTicket(
-    { save: async (ticket) => { persisted.push(ticket); }, list: async (page, limit) => ({ tickets: persisted.slice((page - 1) * limit, page * limit), total: persisted.length }), findById: async (id) => persisted.find((ticket) => ticket.id === id) },
+    repository,
     new DetermineTeam(),
     { recordTicketCreated: async () => {} },
     { error: () => {} },
@@ -24,8 +34,8 @@ function createApp() {
     controllers: [TicketController],
     providers: [
       { provide: CreateTicket, useValue: createTicket },
-      { provide: ListTickets, useValue: new ListTickets({ save: async () => {}, list: async (page, limit) => ({ tickets: persisted.slice((page - 1) * limit, page * limit), total: persisted.length }), findById: async (id) => persisted.find((ticket) => ticket.id === id) }) },
-      { provide: GetTicket, useValue: new GetTicket({ save: async () => {}, list: async () => ({ tickets: persisted, total: persisted.length }), findById: async (id) => persisted.find((ticket) => ticket.id === id) }) },
+      { provide: ListTickets, useValue: new ListTickets(repository) },
+      { provide: GetTicket, useValue: new GetTicket(repository) },
     ],
   }).compile().then(async (module) => {
     const app = module.createNestApplication();
@@ -73,4 +83,43 @@ describe('Ticket HTTP API', () => {
       await app.close();
     }
   });
+  it('filters matching status and category before applying pagination', async () => {
+    const app = await createApp();
+    try {
+      for (const [title, category, priority] of [
+        ['Technical one', 'TECHNICAL', 'HIGH'],
+        ['Billing', 'BILLING', 'LOW'],
+        ['Technical two', 'TECHNICAL', 'MEDIUM'],
+      ]) {
+        await request(app.getHttpServer()).post('/api/v1/tickets').send({
+          title, description: '', category, priority,
+        }).expect(201);
+      }
+      const firstPage = await request(app.getHttpServer())
+        .get('/api/v1/tickets?status=OPEN&category=TECHNICAL&page=1&limit=1').expect(200);
+      expect(firstPage.body.pagination).toEqual({ page: 1, limit: 1, total: 2 });
+      expect(firstPage.body.data.map((ticket: Ticket) => ticket.title)).toEqual(['Technical two']);
+
+      const secondPage = await request(app.getHttpServer())
+        .get('/api/v1/tickets?status=OPEN&category=TECHNICAL&page=2&limit=1').expect(200);
+      expect(secondPage.body.data.map((ticket: Ticket) => ticket.title)).toEqual(['Technical one']);
+      const unfiltered = await request(app.getHttpServer())
+        .get('/api/v1/tickets?category=&status=').expect(200);
+      expect(unfiltered.body.pagination.total).toBe(3);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it.each(['page=0', 'page=1.5', 'page=nope', 'limit=0', 'limit=101', 'status=INVALID', 'category=OTHER'])(
+    'rejects invalid list query %s',
+    async (query) => {
+      const app = await createApp();
+      try {
+        await request(app.getHttpServer()).get(`/api/v1/tickets?${query}`).expect(400);
+      } finally {
+        await app.close();
+      }
+    },
+  );
 });
