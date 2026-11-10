@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { NotificationCapability } from '../../notification/contracts/notification.contract';
-import { RoutingCapability } from '../../routing/contracts/routing.contract';
+import type { RoutingCapability, RoutingDecision } from '../../routing/contracts/routing.contract';
 import { CreateTicket, TicketRepository } from './create-ticket';
 
 const input = { title: 'Cannot sign in', description: '', category: 'TECHNICAL', priority: 'HIGH' } as const;
 const logger = { error: vi.fn() };
 
-function setup(teamCode = 'ENGINEERING_TEAM') {
+function setup(teamCode: RoutingDecision['teamCode'] = 'ENGINEERING_TEAM') {
   const routing: RoutingCapability = { determineTeam: vi.fn().mockResolvedValue({ teamCode, reason: 'test' }) };
   const notifications: NotificationCapability = { recordTicketCreated: vi.fn().mockResolvedValue(undefined) };
   const tickets: TicketRepository = {

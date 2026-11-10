@@ -1,15 +1,9 @@
-export interface RoutingDecision {
-  teamCode: string;
-  reason: string;
-}
+import type { RouteTicketInput, RoutingDecision } from '../contracts/routing.contract';
 
 export function determineRoutingDecision({
   category,
   priority,
-}: {
-  category: string;
-  priority: string;
-}): RoutingDecision {
+}: RouteTicketInput): RoutingDecision {
   if (priority === 'CRITICAL') {
     return { teamCode: 'INCIDENT_TEAM', reason: 'CRITICAL priority' };
   }

@@ -4,8 +4,9 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../../../db/database.module';
 import { supportTickets } from '../../../db/schema';
-import { Ticket, TicketCategory, TicketPriority, TicketStatus, TeamCode } from '../domain/ticket';
+import { Ticket } from '../domain/ticket';
 import { ListTicketQuery, TicketRepository } from '../application/create-ticket';
+import { mapTicketRow } from './map-ticket-row';
 
 @Injectable()
 export class DrizzleTicketRepository implements TicketRepository {
@@ -41,26 +42,11 @@ export class DrizzleTicketRepository implements TicketRepository {
         .limit(query.limit).offset((query.page - 1) * query.limit),
       this.db.select({ total: count() }).from(supportTickets).where(where),
     ]);
-    return {
-      tickets: rows.map((row) => Ticket.reconstitute({
-        ...row,
-        category: row.category as TicketCategory,
-        priority: row.priority as TicketPriority,
-        status: row.status as TicketStatus,
-        assignedTeamCode: row.assignedTeamCode as TeamCode,
-      })),
-      total,
-    };
+    return { tickets: rows.map(mapTicketRow), total };
   }
 
   async findById(id: string): Promise<Ticket | undefined> {
     const [row] = await this.db.select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
-    return row ? Ticket.reconstitute({
-      ...row,
-      category: row.category as TicketCategory,
-      priority: row.priority as TicketPriority,
-      status: row.status as TicketStatus,
-      assignedTeamCode: row.assignedTeamCode as TeamCode,
-    }) : undefined;
+    return row ? mapTicketRow(row) : undefined;
   }
 }

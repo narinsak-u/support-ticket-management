@@ -34,6 +34,17 @@ export interface NewTicket {
   assignedTeamCode: TeamCode;
 }
 
+// PostgreSQL varchar counts Unicode code points, not UTF-16 code units.
+function exceedsCharacterLimit(value: string, max: number): boolean {
+  if (value.length <= max) return false;
+  let count = 0;
+  for (let offset = 0; offset < value.length;) {
+    if (++count > max) return true;
+    offset += value.codePointAt(offset)! > 0xffff ? 2 : 1;
+  }
+  return false;
+}
+
 export class Ticket {
   private constructor(
     readonly id: string,
@@ -47,8 +58,8 @@ export class Ticket {
   ) {}
 
   static validateInput(input: Omit<NewTicket, 'assignedTeamCode'>): void {
-    if (!input.title.trim() || input.title.length > 150) throw new TicketInputError('Title must be non-empty and at most 150 characters');
-    if (input.description.length > 2000) throw new TicketInputError('Description must be at most 2000 characters');
+    if (!input.title.trim() || exceedsCharacterLimit(input.title, 150)) throw new TicketInputError('Title must be non-empty and at most 150 characters');
+    if (exceedsCharacterLimit(input.description, 2000)) throw new TicketInputError('Description must be at most 2000 characters');
     if (!TICKET_CATEGORIES.includes(input.category)) throw new TicketInputError('Category is invalid');
     if (!TICKET_PRIORITIES.includes(input.priority)) throw new TicketInputError('Priority is invalid');
   }
