@@ -25,11 +25,11 @@ done
 created=$(curl --fail --silent --show-error -H 'content-type: application/json' \
   -d '{"title":"Integration smoke ticket","description":"Persisted from a fresh database","category":"BILLING","priority":"HIGH"}' \
   "$base/tickets")
-id=$(node -e 'const t=JSON.parse(process.argv[1]); if (!t.id || t.assignedTeamCode !== "FINANCE_TEAM") process.exit(1); process.stdout.write(t.id)' "$created")
+id=$("${compose[@]}" exec -T backend node -e 'const t=JSON.parse(process.argv[1]); if (!t.id || t.assignedTeamCode !== "FINANCE_TEAM") process.exit(1); process.stdout.write(t.id)' "$created")
 list=$(curl --fail --silent --show-error "$base/tickets")
 detail=$(curl --fail --silent --show-error "$base/tickets/$id")
 notifications=$(curl --fail --silent --show-error "$base/notifications")
-node - "$created" "$list" "$detail" "$notifications" "$id" <<'NODE'
+"${compose[@]}" exec -T backend node - "$created" "$list" "$detail" "$notifications" "$id" <<'NODE'
 const [created, list, detail, notifications] = process.argv.slice(2, 6).map(JSON.parse);
 const id = process.argv[6];
 if (!list.data.some(ticket => ticket.id === id)) throw new Error('Ticket absent from list');
