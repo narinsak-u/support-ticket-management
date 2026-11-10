@@ -1,7 +1,8 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Inject, NotFoundException, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Inject, NotFoundException, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiCreatedResponse, ApiTags } from '@nestjs/swagger';
 import { CreateTicket, GetTicket, ListTickets } from '../application/create-ticket';
 import { CreateTicketDto } from './create-ticket.dto';
+import { ListQueryDto } from './list-query.dto';
 
 @ApiTags('tickets')
 @Controller('tickets')
@@ -19,9 +20,8 @@ export class TicketController {
     return this.createTicket.execute(input);
   }
 
-  @Get()
-  list() {
-    return this.listTickets.execute();
+  list(@Query() query: ListQueryDto) {
+    return this.listTickets.execute(query);
   }
 
   @Get(':id')

@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../../../db/database.module';
 import { supportTickets } from '../../../db/schema';
 import { Ticket, TicketCategory, TicketPriority, TicketStatus, TeamCode } from '../domain/ticket';
-import { TicketRepository } from '../application/create-ticket';
+import { ListTicketQuery, TicketRepository } from '../application/create-ticket';
 
 @Injectable()
 export class DrizzleTicketRepository implements TicketRepository {
@@ -29,12 +29,17 @@ export class DrizzleTicketRepository implements TicketRepository {
     });
   }
 
-  async list(page: number, limit: number): Promise<{ tickets: Ticket[]; total: number }> {
+  async list(query: ListTicketQuery): Promise<{ tickets: Ticket[]; total: number }> {
+    const filters = [
+      query.status ? eq(supportTickets.status, query.status) : undefined,
+      query.category ? eq(supportTickets.category, query.category) : undefined,
+    ].filter((filter) => filter !== undefined);
+    const where = filters.length ? and(...filters) : undefined;
     const [rows, [{ total }]] = await Promise.all([
-      this.db.select().from(supportTickets)
+      this.db.select().from(supportTickets).where(where)
         .orderBy(desc(supportTickets.createdAt), desc(supportTickets.id))
-        .limit(limit).offset((page - 1) * limit),
-      this.db.select({ total: count() }).from(supportTickets),
+        .limit(query.limit).offset((query.page - 1) * query.limit),
+      this.db.select({ total: count() }).from(supportTickets).where(where),
     ]);
     return {
       tickets: rows.map((row) => Ticket.reconstitute({
