@@ -13,21 +13,24 @@ flowchart LR
       SHTTP[Status HTTP] --> SAPP[Status application]
       TAPP --> TD[Ticket domain]
       SAPP --> TD
-      TAPP -->|TicketRepository port| TDB[Drizzle ticket repository]
-      SAPP -->|TicketStatusRepository port| SDB[Drizzle status repository]
+      TAPP -->|uses| TP[TicketRepository port]
+      TDB -->|implements| TP
+      SAPP -->|uses| SP[TicketStatusRepository port]
+      SDB -->|implements| SP
     end
     subgraph Routing[Routing context]
       RAPP[Determine team] --> RD[Routing policy]
     end
     subgraph Notification[Notification context]
       NHTTP[Notification HTTP] --> NAPP[Notification application]
-      NAPP -->|NotificationRecordRepository port| NDB[Drizzle notification repository]
+      NAPP -->|uses| NP[NotificationRecordRepository port]
+      NDB -->|implements| NP
     end
     TAPP -->|RoutingCapability| RAPP
     TAPP -->|NotificationCapability| NAPP
-    TDB --> DB[(PostgreSQL tickets.tickets)]
-    SDB --> DB
-    NDB --> DB
+    TDB -->|tickets.tickets| DB[(PostgreSQL)]
+    SDB -->|tickets.tickets| DB
+    NDB -->|notifications.notifications| DB
     MIGRATE[One-shot Drizzle migration service] --> DB
   end
 ```

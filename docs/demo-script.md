@@ -8,7 +8,7 @@ Start the four services and check health:
 
 ```sh
 docker compose up --build -d
-docker compose ps
+docker compose ps --all
 curl -fsS http://localhost:3000/health
 ```
 
@@ -66,7 +66,12 @@ Open <http://localhost:3000/api/docs>. Show ticket creation/list/detail, status,
 
 ### 9:00–10:30 — Test seam and boundaries
 
-Open `backend/src/modules/ticket/application/create-ticket.ts`. Point out its `TicketRepository`, `RoutingCapability`, and `NotificationCapability` constructor dependencies; the use case can be tested with fakes without starting NestJS or PostgreSQL. Open `backend/src/modules/ticket/application/create-ticket.spec.ts` to show that seam. Also show `backend/src/modules/routing/contracts/routing.contract.ts` and `backend/src/modules/notification/contracts/notification.contract.ts` as stable boundaries. No test command is required for this walkthrough.
+Open `backend/src/modules/ticket/application/create-ticket.ts`. Point out its `TicketRepository`, `RoutingCapability`, and `NotificationCapability` constructor dependencies; the use case can be tested with fakes without starting NestJS or PostgreSQL. Open `backend/src/modules/ticket/application/create-ticket.spec.ts` to show that seam. Run that focused test in Docker without host Node.js:
+
+```sh
+docker build --target build -f backend/Dockerfile -t support-ticket-tests .
+docker run --rm support-ticket-tests npm test -- src/modules/ticket/application/create-ticket.spec.ts
+```
 
 ### 10:30–12:00 — AI trade-off and limitations
 

@@ -50,7 +50,14 @@ Tests are optional for running the Docker application. Host-side backend tests n
 cd backend && npm ci && npm test
 ```
 
-The fresh-database integration smoke script needs Docker, not host Node.js/PostgreSQL:
+Or run the backend tests with Docker alone (the build stage includes development dependencies):
+
+```sh
+docker build --target build -f backend/Dockerfile -t support-ticket-tests .
+docker run --rm support-ticket-tests npm test
+```
+
+The fresh-database integration smoke script needs Docker, Bash, and `curl`, not host Node.js/PostgreSQL:
 
 ```sh
 bash scripts/integration-smoke.sh
