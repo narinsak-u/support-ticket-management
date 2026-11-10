@@ -1,5 +1,5 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
-import { TicketInputError } from '../modules/ticket/domain/ticket';
+import { InvalidStatusTransitionError, TicketInputError } from '../modules/ticket/domain/ticket';
 
 @Catch()
 export class HttpErrorFilter implements ExceptionFilter {
@@ -13,9 +13,15 @@ export class HttpErrorFilter implements ExceptionFilter {
       status = HttpStatus.BAD_REQUEST;
       code = 'INVALID_TICKET';
       message = exception.message;
+    } else if (exception instanceof InvalidStatusTransitionError) {
+      status = HttpStatus.CONFLICT;
+      code = exception.code;
+      message = exception.message;
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
-      code = status === HttpStatus.BAD_REQUEST ? 'VALIDATION_ERROR' : 'HTTP_ERROR';
+      code = status === HttpStatus.BAD_REQUEST ? 'VALIDATION_ERROR'
+        : status === HttpStatus.NOT_FOUND ? 'NOT_FOUND'
+          : status === HttpStatus.CONFLICT ? 'CONFLICT' : 'HTTP_ERROR';
       const detail = exception.getResponse();
       message = typeof detail === 'object' && detail !== null && 'message' in detail
         ? Array.isArray(detail.message) ? detail.message.join(', ') : String(detail.message)
