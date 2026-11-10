@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
 import { NotificationCapability } from '../contracts/notification.contract';
 
 export const NOTIFICATION_RECORD_REPOSITORY = Symbol('NOTIFICATION_RECORD_REPOSITORY');
@@ -14,12 +13,8 @@ export interface NotificationRecordRepository {
   }): Promise<void>;
 }
 
-@Injectable()
 export class RecordNotification implements NotificationCapability {
-  constructor(
-    @Inject(NOTIFICATION_RECORD_REPOSITORY)
-    private readonly repository: NotificationRecordRepository,
-  ) {}
+  constructor(private readonly repository: NotificationRecordRepository) {}
 
   async recordTicketCreated(input: {
     ticketId: string;
