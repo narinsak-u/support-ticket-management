@@ -1,15 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { desc } from 'drizzle-orm';
 import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../../../db/database.module';
 import { notificationRecords } from '../../../db/schema';
-import {
-  NotificationRecordRepository,
-} from '../application/record-notification';
+import { NotificationRecord, NotificationRecordRepository } from '../application/record-notification';
 
 const notificationSchema = { notificationRecords };
-
-type NotificationRecord = Parameters<NotificationRecordRepository['save']>[0];
 
 @Injectable()
 export class DrizzleNotificationRepository implements NotificationRecordRepository {
@@ -21,5 +18,12 @@ export class DrizzleNotificationRepository implements NotificationRecordReposito
 
   async save(record: NotificationRecord): Promise<void> {
     await this.db.insert(notificationRecords).values(record);
+  }
+
+  findMany(): Promise<NotificationRecord[]> {
+    return this.db.select().from(notificationRecords).orderBy(
+      desc(notificationRecords.createdAt),
+      desc(notificationRecords.id),
+    );
   }
 }
