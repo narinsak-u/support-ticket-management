@@ -10,6 +10,8 @@ export const TICKET_REPOSITORY = Symbol('TICKET_REPOSITORY');
 
 export interface TicketRepository {
   save(ticket: Ticket): Promise<void>;
+  list(page: number, limit: number): Promise<{ tickets: Ticket[]; total: number }>;
+  findById(id: string): Promise<Ticket | undefined>;
 }
 
 export class CreateTicket {
@@ -31,5 +33,22 @@ export class CreateTicket {
       this.logger.error('Failed to record ticket-created notification', error);
     }
     return ticket;
+  }
+}
+
+export class ListTickets {
+  constructor(private readonly tickets: TicketRepository) {}
+
+  async execute() {
+    const { tickets, total } = await this.tickets.list(1, 20);
+    return { data: tickets, pagination: { page: 1, limit: 20, total } };
+  }
+}
+
+export class GetTicket {
+  constructor(private readonly tickets: TicketRepository) {}
+
+  execute(id: string): Promise<Ticket | undefined> {
+    return this.tickets.findById(id);
   }
 }

@@ -9,7 +9,11 @@ const logger = { error: vi.fn() };
 function setup(teamCode = 'ENGINEERING_TEAM') {
   const routing: RoutingCapability = { determineTeam: vi.fn().mockResolvedValue({ teamCode, reason: 'test' }) };
   const notifications: NotificationCapability = { recordTicketCreated: vi.fn().mockResolvedValue(undefined) };
-  const tickets: TicketRepository = { save: vi.fn().mockResolvedValue(undefined) };
+  const tickets: TicketRepository = {
+    save: vi.fn().mockResolvedValue(undefined),
+    list: vi.fn().mockResolvedValue({ tickets: [], total: 0 }),
+    findById: vi.fn().mockResolvedValue(undefined),
+  };
   return { useCase: new CreateTicket(tickets, routing, notifications, logger), routing, notifications, tickets };
 }
 
