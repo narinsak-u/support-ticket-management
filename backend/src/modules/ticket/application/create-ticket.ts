@@ -1,16 +1,21 @@
 import type { NotificationCapability } from '../../notification/contracts/notification.contract';
 import type { RoutingCapability } from '../../routing/contracts/routing.contract';
-import { NewTicket, Ticket } from '../domain/ticket';
+import { NewTicket, Ticket, TicketCategory, TicketStatus } from '../domain/ticket';
 
 export interface ApplicationLogger {
   error(message: string, error: unknown): void;
 }
 
-export const TICKET_REPOSITORY = Symbol('TICKET_REPOSITORY');
+export interface ListTicketQuery {
+  status?: TicketStatus;
+  category?: TicketCategory;
+  page: number;
+  limit: number;
+}
 
 export interface TicketRepository {
   save(ticket: Ticket): Promise<void>;
-  list(page: number, limit: number): Promise<{ tickets: Ticket[]; total: number }>;
+  list(query: ListTicketQuery): Promise<{ tickets: Ticket[]; total: number }>;
   findById(id: string): Promise<Ticket | undefined>;
 }
 
@@ -39,9 +44,11 @@ export class CreateTicket {
 export class ListTickets {
   constructor(private readonly tickets: TicketRepository) {}
 
-  async execute() {
-    const { tickets, total } = await this.tickets.list(1, 20);
-    return { data: tickets, pagination: { page: 1, limit: 20, total } };
+  async execute(query: { status?: TicketStatus; category?: TicketCategory; page?: number; limit?: number } = {}) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const { tickets, total } = await this.tickets.list({ ...query, page, limit });
+    return { data: tickets, pagination: { page, limit, total } };
   }
 }
 
