@@ -4,8 +4,9 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../../../db/database.module';
 import { supportTickets } from '../../../db/schema';
-import { Ticket, TicketCategory, TicketPriority, TicketStatus, TeamCode } from '../domain/ticket';
+import { Ticket, TicketStatus } from '../domain/ticket';
 import { TicketStatusRepository } from '../application/update-status';
+import { mapTicketRow } from './map-ticket-row';
 
 @Injectable()
 export class DrizzleTicketStatusRepository implements TicketStatusRepository {
@@ -17,13 +18,7 @@ export class DrizzleTicketStatusRepository implements TicketStatusRepository {
 
   async findById(id: string): Promise<Ticket | undefined> {
     const [row] = await this.db.select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
-    return row ? Ticket.reconstitute({
-      ...row,
-      category: row.category as TicketCategory,
-      priority: row.priority as TicketPriority,
-      status: row.status as TicketStatus,
-      assignedTeamCode: row.assignedTeamCode as TeamCode,
-    }) : undefined;
+    return row ? mapTicketRow(row) : undefined;
   }
 
   async updateStatus(ticket: Ticket, expectedStatus: TicketStatus): Promise<boolean> {

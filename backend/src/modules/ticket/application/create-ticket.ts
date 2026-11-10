@@ -7,7 +7,6 @@ export interface ApplicationLogger {
 }
 export const TICKET_REPOSITORY = Symbol('TICKET_REPOSITORY');
 
-
 export interface ListTicketQuery {
   status?: TicketStatus;
   category?: TicketCategory;
@@ -32,7 +31,7 @@ export class CreateTicket {
   async execute(input: Omit<NewTicket, 'assignedTeamCode'>): Promise<Ticket> {
     Ticket.validateInput(input);
     const decision = await this.routing.determineTeam({ category: input.category, priority: input.priority });
-    const ticket = Ticket.create({ ...input, assignedTeamCode: decision.teamCode as NewTicket['assignedTeamCode'] });
+    const ticket = Ticket.create({ ...input, assignedTeamCode: decision.teamCode });
     await this.tickets.save(ticket);
     try {
       await this.notifications.recordTicketCreated({ ticketId: ticket.id, title: ticket.title, assignedTeamCode: ticket.assignedTeamCode });
