@@ -12,7 +12,11 @@ import { DrizzleNotificationRepository } from './infrastructure/drizzle-notifica
   providers: [
     DrizzleNotificationRepository,
     { provide: NOTIFICATION_RECORD_REPOSITORY, useExisting: DrizzleNotificationRepository },
-    { provide: NOTIFICATION_CAPABILITY, useClass: RecordNotification },
+    {
+      provide: NOTIFICATION_CAPABILITY,
+      useFactory: (repository: DrizzleNotificationRepository) => new RecordNotification(repository),
+      inject: [NOTIFICATION_RECORD_REPOSITORY],
+    },
   ],
   exports: [NOTIFICATION_CAPABILITY],
 })
