@@ -46,5 +46,15 @@ services:
       retries: 30
       start_period: 5s
 
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "127.0.0.1::80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
 volumes:
   postgres_data:
