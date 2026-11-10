@@ -44,6 +44,19 @@ export class Ticket {
     if (!TICKET_PRIORITIES.includes(input.priority)) throw new TicketInputError('Priority is invalid');
   }
 
+  static reconstitute(input: {
+    id: string;
+    title: string;
+    description: string;
+    category: TicketCategory;
+    priority: TicketPriority;
+    status: TicketStatus;
+    assignedTeamCode: TeamCode;
+    createdAt: Date;
+  }): Ticket {
+    return new Ticket(input.id, input.title, input.description, input.category, input.priority, input.status, input.assignedTeamCode, input.createdAt);
+  }
+
   static create(input: NewTicket): Ticket {
     this.validateInput(input);
     if (!TEAM_CODES.includes(input.assignedTeamCode)) throw new TicketInputError('Assigned team is invalid');
