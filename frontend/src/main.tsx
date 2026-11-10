@@ -1,15 +1,26 @@
-import { StrictMode, useState } from 'react';
+import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { TicketStatusAction } from './features/tickets/TicketStatusAction';
+import { NotificationPanel } from './features/notifications/NotificationPanel';
 import './style.css';
 
+function withinCharacterLimit(value: string, max: number): boolean {
+  if (value.length <= max) return true;
+  let count = 0;
+  for (let offset = 0; offset < value.length;) {
+    if (++count > max) return false;
+    offset += value.codePointAt(offset)! > 0xffff ? 2 : 1;
+  }
+  return true;
+}
+
 const ticketSchema = z.object({
-  title: z.string().trim().min(1, 'Enter a title.').max(150, 'Title must be 150 characters or fewer.'),
-  description: z.string().trim().max(2000, 'Description must be 2,000 characters or fewer.'),
+  title: z.string().trim().min(1, 'Enter a title.').refine((value) => withinCharacterLimit(value, 150), { message: 'Title must be 150 characters or fewer.' }),
+  description: z.string().trim().refine((value) => withinCharacterLimit(value, 2000), { message: 'Description must be 2,000 characters or fewer.' }),
   category: z.enum(['TECHNICAL', 'BILLING', 'GENERAL'], { message: 'Choose a category.' }),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'], { message: 'Choose a priority.' }),
 });
@@ -21,17 +32,10 @@ type Ticket = TicketInput & {
   assignedTeamCode: string;
   createdAt: string;
 };
-type NotificationRecord = {
-  id: string;
-  ticketId: string;
-  type: string;
-  message: string;
-  createdAt: string;
-};
 
 async function requestJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`Could not load ${url.includes('notifications') ? 'notifications' : 'tickets'}. Try again.`);
+  if (!response.ok) throw new Error('Could not load tickets. Try again.');
   return response.json() as Promise<T>;
 }
 
@@ -71,13 +75,16 @@ function App() {
     ),
     retry: false,
   });
-  const notificationQuery = useQuery({
-    queryKey: ['notifications'],
-    queryFn: () => requestJson<{ data: NotificationRecord[] }>('/api/v1/notifications'),
-    retry: false,
-  });
+  useEffect(() => {
+    const total = ticketQuery.data?.pagination.total;
+    if (total === undefined) return;
+    const lastPage = Math.max(1, Math.ceil(total / limit));
+    if (page > lastPage) {
+      setPage(lastPage);
+      setSelectedId(null);
+    }
+  }, [ticketQuery.data?.pagination.total, page, limit]);
   const tickets = ticketQuery.data?.data ?? [];
-  const notifications = notificationQuery.data?.data ?? [];
   const activeId = selectedId ?? tickets[0]?.id ?? null;
   const detailQuery = useQuery({
     queryKey: ['ticket', activeId],
@@ -148,12 +155,12 @@ function App() {
             <form className="ticket-form" onSubmit={submit} noValidate>
               <div className="field">
                 <label htmlFor="title">Title</label>
-                <input id="title" maxLength={150} aria-invalid={Boolean(errors.title)} aria-describedby={errors.title ? 'title-error' : 'title-hint'} {...register('title')} />
+                <input id="title" aria-invalid={Boolean(errors.title)} aria-describedby={errors.title ? 'title-error' : 'title-hint'} {...register('title')} />
                 <div className="field-foot"><span id="title-hint">Summarize your request in a few words.</span>{errors.title && <span className="field-error" id="title-error">{errors.title.message}</span>}</div>
               </div>
               <div className="field">
                 <label htmlFor="description">Description</label>
-                <textarea id="description" rows={5} maxLength={2000} aria-invalid={Boolean(errors.description)} aria-describedby={errors.description ? 'description-error' : undefined} {...register('description')} />
+                <textarea id="description" rows={5} aria-invalid={Boolean(errors.description)} aria-describedby={errors.description ? 'description-error' : undefined} {...register('description')} />
                 {errors.description && <span className="field-error" id="description-error">{errors.description.message}</span>}
               </div>
               <div className="choice-grid">
@@ -231,7 +238,7 @@ function App() {
                         <div><dt>Assigned Team</dt><dd>{detailQuery.data.assignedTeamCode}</dd></div>
                         <div><dt>Created</dt><dd>{new Date(detailQuery.data.createdAt).toLocaleString()}</dd></div>
                       </dl>
-                      <TicketStatusAction ticketId={detailQuery.data.id} status={detailQuery.data.status} onChanged={() => {
+                      <TicketStatusAction key={detailQuery.data.id} ticketId={detailQuery.data.id} status={detailQuery.data.status} onChanged={() => {
                         queryClient.invalidateQueries({ queryKey: ['tickets'] });
                         queryClient.invalidateQueries({ queryKey: ['ticket', detailQuery.data.id] });
                       }} />
@@ -240,18 +247,7 @@ function App() {
           </div>
         </section>
 
-        <section className="notification-section" aria-labelledby="notifications-title">
-          <div className="section-heading"><div><p className="eyebrow">Activity</p><h2 id="notifications-title">Notifications</h2></div></div>
-          {notificationQuery.isLoading ? <p className="state-message" role="status">Loading notifications…</p>
-            : notificationQuery.isError ? <p className="state-message error-state" role="alert">{notificationQuery.error.message}</p>
-              : notifications.length === 0 ? <p className="state-message">No notification records yet.</p>
-                : <ol className="notification-list">{notifications.map((record) => (
-                  <li className="notification-item" key={record.id}>
-                    <span className="notification-mark" aria-hidden="true">•</span>
-                    <div><p>{record.message}</p><a href={`#ticket-${record.ticketId}`} onClick={(event) => { event.preventDefault(); setSelectedId(record.ticketId); }} aria-label={`View ticket ${record.ticketId}`}>Ticket {record.ticketId}</a><time dateTime={record.createdAt}>{new Date(record.createdAt).toLocaleString()}</time></div>
-                  </li>
-                ))}</ol>}
-        </section>
+        <NotificationPanel onSelectTicket={setSelectedId} />
       </div>
       <footer className="page-footer"><span>support-ticket</span><span>Requests, routed with care.</span></footer>
     </main>
