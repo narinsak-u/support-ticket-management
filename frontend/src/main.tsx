@@ -29,10 +29,19 @@ async function createTicket(input: TicketInput): Promise<Ticket> {
   });
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
-    const message = typeof body === 'object' && body !== null && 'message' in body
-      ? body.message
+    const error = typeof body === 'object' && body !== null && 'error' in body
+      ? body.error
       : null;
-    throw new Error(Array.isArray(message) ? message.join(' ') : typeof message === 'string' ? message : 'Ticket could not be created. Try again.');
+    const message = typeof error === 'object' && error !== null && 'message' in error
+      ? error.message
+      : null;
+    const fallback = 'Ticket could not be created. Try again.';
+    const safeMessage = response.status < 500
+      ? Array.isArray(message) && message.every((part): part is string => typeof part === 'string')
+        ? message.join(' ')
+        : typeof message === 'string' ? message : fallback
+      : fallback;
+    throw new Error(safeMessage);
   }
   return response.json() as Promise<Ticket>;
 }
