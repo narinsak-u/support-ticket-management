@@ -8,7 +8,7 @@ import './style.css';
 
 const ticketSchema = z.object({
   title: z.string().trim().min(1, 'Enter a title.').max(150, 'Title must be 150 characters or fewer.'),
-  description: z.string().trim().min(1, 'Enter a description.').max(2000, 'Description must be 2,000 characters or fewer.'),
+  description: z.string().trim().max(2000, 'Description must be 2,000 characters or fewer.'),
   category: z.enum(['TECHNICAL', 'BILLING', 'GENERAL'], { message: 'Choose a category.' }),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'], { message: 'Choose a priority.' }),
 });
@@ -56,9 +56,9 @@ function App() {
   return (
     <main className="workspace">
       <header className="topbar">
-        <a className="brand" href="/" aria-label="Support Desk home">
+        <a className="brand" href="/" aria-label="support-ticket home">
           <span className="brand-mark" aria-hidden="true">S</span>
-          <span>Support Desk</span>
+          <span>support-ticket</span>
         </a>
         <span className="workspace-label">Ticket workspace</span>
       </header>
@@ -80,7 +80,6 @@ function App() {
               <p className="eyebrow">New request</p>
               <h2 id="form-title">Create a ticket</h2>
             </div>
-            <span className="required-note">All fields required</span>
           </div>
 
           {mutation.data ? (
@@ -142,7 +141,7 @@ function App() {
           )}
         </section>
       </div>
-      <footer className="page-footer"><span>Support Desk</span><span>Requests, routed with care.</span></footer>
+      <footer className="page-footer"><span>support-ticket</span><span>Requests, routed with care.</span></footer>
     </main>
   );
 }
