@@ -1,4 +1,4 @@
-Status: ready-for-agent
+Status: resolved
 
 # Support Ticket MVP
 
@@ -97,4 +97,8 @@ Build the `support-ticket` proof of concept described in `docs/spec.md`: a React
 
 - The source architecture specification is the authoritative detailed reference for module contracts, database fields, Docker configuration, milestones, and demo expectations.
 - The domain glossary defines “support ticket,” “Routing,” “Team,” and “Notification record.” Use those terms consistently.
-- This repository has no existing code or ADRs for the feature. The app is not implemented by creating this spec; implementation remains a separate task.
+- The implementation is complete on `integration/support-ticket`; the source architecture specification remains the authoritative acceptance reference.
+
+## Answer
+
+All seven implementation tickets are resolved on `integration/support-ticket`. Verification: 36 backend tests, production Docker builds, disposable four-service fresh-database smoke, and browser workflows for creation, routing, notifications, browsing, status conflicts, filtering, pagination, and Unicode boundaries. The API is documented through Swagger; setup, architecture, decisions, and demo are documented in the repository. Human approval remains unrecorded in the AI development log.

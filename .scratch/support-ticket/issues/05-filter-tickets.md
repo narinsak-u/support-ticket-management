@@ -4,10 +4,14 @@
 
 **Blocked by:** 03: Browse support tickets and notification records
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] The UI and API filter ticket lists by status and category.
-- [ ] Pagination defaults to page 1 and limit 20; a limit above 100 receives the documented validation error.
-- [ ] Results sort by creation time descending, then ID descending, so pages remain deterministic.
-- [ ] Filter and pagination changes update the displayed results and preserve clear loading, empty, and error states.
-- [ ] API and browser tests cover filter combinations, defaults, maximum limit, and deterministic ordering.
+- [x] The UI and API filter ticket lists by status and category.
+- [x] Pagination defaults to page 1 and limit 20; a limit above 100 receives the documented validation error.
+- [x] Results sort by creation time descending, then ID descending, so pages remain deterministic.
+- [x] Filter and pagination changes update the displayed results and preserve clear loading, empty, and error states.
+- [x] API and browser tests cover filter combinations, defaults, maximum limit, and deterministic ordering.
+
+## Answer
+
+API tests cover filters, defaults, bounds, and stable ordering; browser checks cover filter combinations. With 21 OPEN tickets, updating the only ticket on page 2 correctly returns the filtered UI to page 1 of 1 with 20 rows.
