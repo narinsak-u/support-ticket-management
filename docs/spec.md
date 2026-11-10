@@ -1,0 +1,1474 @@
+# support-ticket — Implementation Specification
+
+**Project:** support-ticket — Composable Ticket \& Workflow System  
+**Type:** Architecture-first Proof of Concept  
+**Frontend:** React, Vite, TypeScript, Tailwind CSS  
+**Backend:** NestJS, TypeScript, Swagger/OpenAPI  
+**Database:** PostgreSQL, Drizzle ORM  
+**Testing:** Vitest, Supertest  
+**Deployment:** Docker Compose
+
+---
+
+# 1\. Project Objectives
+
+## 1.1 Overview
+
+support-ticket is a small support-ticket management application designed to demonstrate:
+
+1. Modular Monolith architecture with explicit business boundaries.
+2. Clean Architecture within each business module.
+3. Composable business capabilities connected through stable interfaces.
+4. Database abstraction through repository ports and adapters.
+5. Reproducible containerized deployment.
+6. AI-assisted development with human verification.
+
+The primary goal is **architecture quality and explainability**, not feature quantity.
+
+## 1.2 Core Business Flow
+
+A user creates a support ticket. The system automatically selects a responsible team based on the ticket category and priority, persists the ticket, and records a notification.
+
+``` text
+User creates ticket
+        |
+        v
+Ticket Module
+        |
+        +----> Routing Capability
+        |       - Evaluate category
+        |       - Evaluate priority
+        |       - Return team assignment
+        |
+        v
+Persist Ticket
+        |
+        v
+Notification Capability
+        |
+        v
+Persist Notification Record
+        |
+        v
+Return Ticket Response
+```
+
+Notification recording is best-effort in this PoC. A notification failure must not reverse a successfully committed ticket. Such failures must be logged.
+
+## 1.3 In Scope
+
+- Create support ticket.
+- List and retrieve support tickets.
+- Automatically route new tickets to a team.
+- Update ticket status.
+- Generate notification records on ticket creation.
+- Display tickets and notifications using a simple React UI.
+- Provide automated tests.
+- Run the system using Docker Compose.
+- Document architectural decisions and AI-assisted development.
+
+## 1.4 Out of Scope
+
+- User authentication and RBAC.
+- Actual email, SMS, or push delivery.
+- Real-time WebSocket notifications.
+- File attachments.
+- Redis, Kafka, or RabbitMQ.
+- Kubernetes deployment.
+- Distributed microservices.
+- Complex workflow builders.
+- Ticket comments and attachments.
+- SLA management.
+- Production-grade notification delivery guarantees.
+
+These features should not be implemented unless all core acceptance criteria have been satisfied and additional scope is explicitly approved.
+
+---
+
+# 2\. Business Modules
+
+The backend contains three business modules.
+
+## 2.1 Ticket Module
+
+**Responsibility:** Own ticket lifecycle and business rules.
+
+Capabilities:
+
+- Create Ticket.
+- Get Ticket.
+- List Tickets.
+- Update Ticket Status.
+- Assign Team using the Routing Capability.
+
+Owns:
+
+- Ticket entity.
+- Ticket status transitions.
+- Ticket repository.
+- Ticket HTTP endpoints.
+- `tickets` database table.
+
+Business rules:
+
+- A ticket must have a non-empty title.
+- Title maximum length: 150 characters.
+- Description maximum length: 2,000 characters.
+- Category must be `TECHNICAL`, `BILLING`, or `GENERAL`.
+- Priority must be `LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`.
+- A new ticket starts with `OPEN` status.
+- A ticket must have a valid team assignment before being persisted.
+- Ticket status transitions must follow the defined state machine.
+
+### Ticket Status State Machine
+
+``` text
+OPEN
+  |
+  v
+IN_PROGRESS
+  |
+  v
+RESOLVED
+```
+
+Allowed transitions:
+
+| Current | Next | Allowed |
+| --- | --- | --- |
+| OPEN | IN\_PROGRESS | Yes |
+| IN\_PROGRESS | RESOLVED | Yes |
+| OPEN | RESOLVED | No |
+| RESOLVED | OPEN | No |
+| RESOLVED | IN\_PROGRESS | No |
+
+Invalid transitions must return a domain error.
+
+A richer workflow including reopening or cancellation is intentionally excluded.
+
+## 2.2 Routing Module
+
+**Responsibility:** Determine which team should handle a ticket.
+
+Capabilities:
+
+- Evaluate ticket category and priority.
+- Select the responsible team.
+- Return routing decisions through a public contract.
+
+For the PoC, routing policies are deterministic and configured in code rather than stored in the database.
+
+### Routing Rules
+
+| Condition | Assigned Team |
+| --- | --- |
+| Priority = CRITICAL | INCIDENT\_TEAM |
+| Category = TECHNICAL | ENGINEERING\_TEAM |
+| Category = BILLING | FINANCE\_TEAM |
+| Category = GENERAL | SUPPORT\_TEAM |
+
+**Rule precedence:** CRITICAL priority overrides category-based routing.
+
+Examples:
+
+- TECHNICAL + HIGH → ENGINEERING\_TEAM
+- BILLING + MEDIUM → FINANCE\_TEAM
+- GENERAL + LOW → SUPPORT\_TEAM
+- BILLING + CRITICAL → INCIDENT\_TEAM
+
+Routing must not read or write Ticket database tables.
+
+The Routing Module owns routing business policy, not Ticket lifecycle.
+
+## 2.3 Notification Module
+
+**Responsibility:** Record notifications generated by business operations.
+
+Capabilities:
+
+- Record a notification when a ticket is created.
+- Retrieve stored notification records.
+
+Owns:
+
+- Notification entity.
+- Notification repository.
+- `notifications` database table.
+
+Example message:
+
+> Ticket TCK-001 was assigned to ENGINEERING_TEAM.
+
+For the MVP, no actual notification is sent to users.
+
+The notification operation is invoked through a typed capability interface after the Ticket transaction commits. An asynchronous event bus is not required.
+
+This is an intentional design decision: use synchronous in-process composition for a small PoC while clearly documenting that notification delivery is not durable or guaranteed.
+
+---
+
+# 3\. Architecture Design
+
+## 3.1 Architecture Style
+
+Use a **Modular Monolith** with Clean Architecture inside each business module.
+
+``` text
+                  React Frontend
+                        |
+                        | HTTP / JSON
+                        v
+              NestJS Modular Monolith
+                        |
+        +---------------+---------------+
+        |               |               |
+        v               v               v
+   Ticket Module   Routing Module   Notification
+        |               |             Module
+        |               |               |
+        +----- Business Contracts ------+
+        |                               |
+        v                               v
+   Ticket Repository             Notification Repository
+        |                               |
+        +---------------+---------------+
+                        |
+                        v
+                    PostgreSQL
+```
+
+All modules run inside one NestJS application process.
+
+Do not implement HTTP communication between internal modules.
+
+## 3.2 Clean Architecture Layers
+
+Each business module should use only the layers it needs.
+
+### Domain
+
+Contains:
+
+- Entities.
+- Value objects where useful.
+- Domain errors.
+- Business invariants.
+- State-transition rules.
+
+Constraints:
+
+- No NestJS decorators.
+- No SQL or ORM imports.
+- No HTTP request/response types.
+- No database access.
+- No external infrastructure dependencies.
+
+### Application
+
+Contains:
+
+- Use cases.
+- Commands and results.
+- Repository interfaces.
+- Consumed capability interfaces.
+- Application orchestration.
+
+Constraints:
+
+- Depends on domain models and explicit contracts.
+- Must not import concrete PostgreSQL adapters.
+- Should remain executable in unit tests without starting NestJS.
+
+### Infrastructure
+
+Contains:
+
+- Drizzle ORM schemas.
+- PostgreSQL repository implementations.
+- External or in-process capability adapters.
+- Database mapping logic.
+
+### Presentation
+
+Contains:
+
+- NestJS controllers.
+- Request DTOs.
+- Input validation.
+- HTTP response mapping.
+- Exception filters.
+
+Presentation should never contain database queries or core business rules.
+
+## 3.3 Dependency Rules
+
+The following dependencies are allowed:
+
+``` text
+Presentation ---> Application ---> Domain
+                        |
+                        v
+               Application Ports
+                        ^
+                        |
+                Infrastructure
+```
+
+The infrastructure implements ports defined by the application.
+
+Cross-module interactions must use public business capability contracts.
+
+Forbidden dependencies:
+
+``` text
+Ticket Application ---> Routing Infrastructure
+
+Ticket Repository ---> Notification Repository
+
+Ticket Domain ---> NestJS
+
+Routing Module ---> Ticket Database Table
+```
+
+NestJS-specific wiring should live in module composition files rather than inside business entities or use cases.
+
+---
+
+# 4\. Project Structure
+
+Use a single repository with separately deployable frontend and backend applications.
+
+``` text
+support-ticket/
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── App.tsx
+│   │   │   └── providers.tsx
+│   │   ├── features/
+│   │   │   ├── tickets/
+│   │   │   │   ├── api/
+│   │   │   │   ├── components/
+│   │   │   │   ├── hooks/
+│   │   │   │   └── types.ts
+│   │   │   └── notifications/
+│   │   │       ├── api/
+│   │   │       └── components/
+│   │   ├── shared/
+│   │   │   ├── api/
+│   │   │   └── ui/
+│   │   └── main.tsx
+│   ├── Dockerfile
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── backend/
+│   ├── src/
+│   │   ├── main.ts
+│   │   ├── app.module.ts
+│   │   │
+│   │   ├── modules/
+│   │   │   ├── ticket/
+│   │   │   │   ├── domain/
+│   │   │   │   │   ├── ticket.entity.ts
+│   │   │   │   │   ├── ticket-status.ts
+│   │   │   │   │   └── errors.ts
+│   │   │   │   ├── application/
+│   │   │   │   │   ├── use-cases/
+│   │   │   │   │   │   ├── create-ticket.ts
+│   │   │   │   │   │   ├── get-ticket.ts
+│   │   │   │   │   │   ├── list-tickets.ts
+│   │   │   │   │   │   └── update-status.ts
+│   │   │   │   │   └── ports/
+│   │   │   │   │       └── ticket-repository.ts
+│   │   │   │   ├── infrastructure/
+│   │   │   │   │   └── drizzle-ticket.repository.ts
+│   │   │   │   ├── presentation/
+│   │   │   │   │   ├── ticket.controller.ts
+│   │   │   │   │   └── dto/
+│   │   │   │   └── ticket.module.ts
+│   │   │   │
+│   │   │   ├── routing/
+│   │   │   │   ├── domain/
+│   │   │   │   │   └── routing-policy.ts
+│   │   │   │   ├── application/
+│   │   │   │   │   └── determine-team.ts
+│   │   │   │   ├── contracts/
+│   │   │   │   │   └── routing.contract.ts
+│   │   │   │   └── routing.module.ts
+│   │   │   │
+│   │   │   └── notification/
+│   │   │       ├── domain/
+│   │   │       │   └── notification.entity.ts
+│   │   │       ├── application/
+│   │   │       │   ├── record-notification.ts
+│   │   │       │   └── ports/
+│   │   │       ├── contracts/
+│   │   │       │   └── notification.contract.ts
+│   │   │       ├── infrastructure/
+│   │   │       │   └── drizzle-notification.repository.ts
+│   │   │       ├── presentation/
+│   │   │       │   └── notification.controller.ts
+│   │   │       └── notification.module.ts
+│   │   │
+│   │   ├── infrastructure/
+│   │   │   └── database/
+│   │   │       ├── database.module.ts
+│   │   │       ├── database.provider.ts
+│   │   │       └── schema/
+│   │   │           ├── ticket.schema.ts
+│   │   │           └── notification.schema.ts
+│   │   └── db/
+│   │       └── migrate.ts
+│   ├── drizzle/
+│   ├── Dockerfile
+│   ├── drizzle.config.ts
+│   └── package.json
+│
+├── docs/
+│   ├── architecture.md
+│   ├── decisions.md
+│   ├── ai-development-log.md
+│   └── demo-script.md
+│
+├── compose.yml
+├── .env.example
+└── README.md
+```
+
+**Important:** Do not create unnecessary generic base classes, shared repositories, generic use-case frameworks, or universal domain abstractions.
+
+Share only truly cross-cutting technical infrastructure.
+
+---
+
+# 5\. PBC Contracts and Dependency Injection
+
+## 5.1 Routing Capability Contract
+
+Expose a stable public interface owned by the Routing Module.
+
+``` typescript
+export interface RouteTicketInput {
+  category: TicketCategory;
+  priority: TicketPriority;
+}
+
+export interface RoutingDecision {
+  teamCode: TeamCode;
+  reason: string;
+}
+
+export interface RoutingCapability {
+  determineTeam(
+    input: RouteTicketInput
+  ): Promise<RoutingDecision>;
+}
+
+export const ROUTING_CAPABILITY =
+  Symbol("ROUTING_CAPABILITY");
+```
+
+The contract must not expose Routing Module internal entities or ORM models.
+
+## 5.2 Notification Capability Contract
+
+``` typescript
+export interface TicketCreatedNotification {
+  ticketId: string;
+  title: string;
+  assignedTeamCode: string;
+}
+
+export interface NotificationCapability {
+  recordTicketCreated(
+    event: TicketCreatedNotification
+  ): Promise<void>;
+}
+
+export const NOTIFICATION_CAPABILITY =
+  Symbol("NOTIFICATION_CAPABILITY");
+```
+
+This interface represents an in-process business capability.
+
+It is not an external email service contract.
+
+## 5.3 Repository Port
+
+Example Ticket Repository:
+
+``` typescript
+export interface TicketRepository {
+  save(ticket: Ticket): Promise<void>;
+
+  findById(id: string): Promise<Ticket | null>;
+
+  findMany(
+    query: ListTicketQuery
+  ): Promise<Ticket[]>;
+
+  updateStatus(
+    id: string,
+    expectedStatus: TicketStatus,
+    nextStatus: TicketStatus
+  ): Promise<boolean>;
+}
+
+export const TICKET_REPOSITORY =
+  Symbol("TICKET_REPOSITORY");
+```
+
+The status update operation uses a conditional update to prevent conflicting concurrent status changes.
+
+## 5.4 Application Use Case
+
+Example dependencies for CreateTicket:
+
+``` typescript
+export class CreateTicketUseCase {
+  constructor(
+    private readonly tickets: TicketRepository,
+    private readonly routing: RoutingCapability,
+    private readonly notifications: NotificationCapability,
+    private readonly logger: ApplicationLogger
+  ) {}
+}
+```
+
+Expected execution:
+
+1. Validate application input.
+2. Request a routing decision.
+3. Create Ticket domain entity.
+4. Persist Ticket.
+5. Request notification recording.
+6. Catch/log notification failure without undoing committed ticket.
+7. Return Ticket result.
+
+Domain validation must happen before persistence.
+
+No database or HTTP calls should occur inside the Ticket entity.
+
+## 5.5 NestJS Composition
+
+NestJS modules should provide concrete implementations through DI tokens.
+
+Example:
+
+``` typescript
+@Module({
+  providers: [
+    DetermineTeamUseCase,
+    {
+      provide: ROUTING_CAPABILITY,
+      useExisting: DetermineTeamUseCase,
+    },
+  ],
+  exports: [ROUTING_CAPABILITY],
+})
+export class RoutingModule {}
+```
+
+Use `@Inject(ROUTING_CAPABILITY)` in a NestJS composition adapter or provider factory when injecting the abstract dependency.
+
+Prefer wiring plain TypeScript use-case classes through `useFactory` in the NestJS module rather than adding `@Injectable()` to all application classes.
+
+The Ticket Module may import RoutingModule and NotificationModule to access their exported public capability tokens. It must never import their repositories or private implementation classes.
+
+## 5.6 Composability Demonstration
+
+Implement:
+
+- Real routing implementation using the deterministic routing policy.
+- Fake routing implementation for unit tests.
+
+The same `CreateTicketUseCase` must work with either implementation without code changes.
+
+Demonstrate a changed routing policy by replacing the routing implementation in a test.
+
+Do not implement an external HTTP Routing Adapter in the MVP. Describe it as a possible future extension.
+
+---
+
+# 6\. API Design
+
+All business endpoints use the prefix `/api/v1`.
+
+## 6.1 Endpoint Summary
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| POST | `/tickets` | Create ticket |
+| GET | `/tickets` | List tickets |
+| GET | `/tickets/:id` | Get ticket details |
+| PATCH | `/tickets/:id/status` | Update status |
+| GET | `/notifications` | List notification records |
+
+The prefix `/api/v1` must be included in the actual routes.
+
+Also implement:
+
+- `GET /health` for health checking.
+
+**API documentation:** Generate an OpenAPI specification from the NestJS controllers and DTOs using `@nestjs/swagger`. Serve unauthenticated Swagger UI at `/api/docs` and the OpenAPI JSON at `/api/docs-json`. Document every `/api/v1` endpoint and `/health`, including request, response, and error schemas.
+
+## 6.2 Create Ticket
+
+**POST /api/v1/tickets**
+
+Request:
+
+``` json
+{
+  "title": "Cannot access production dashboard",
+  "description": "Dashboard returns an error.",
+  "category": "TECHNICAL",
+  "priority": "HIGH"
+}
+```
+
+Response: `201 Created`
+
+``` json
+{
+  "id": "c0a80101-0000-4000-8000-000000000001",
+  "title": "Cannot access production dashboard",
+  "description": "Dashboard returns an error.",
+  "category": "TECHNICAL",
+  "priority": "HIGH",
+  "status": "OPEN",
+  "assignedTeamCode": "ENGINEERING_TEAM",
+  "createdAt": "2026-11-10T10:00:00.000Z"
+}
+```
+
+The UUID and timestamp are illustrative examples.
+
+The client must not submit `status` or `assignedTeamCode` when creating a ticket.
+
+Both values are decided by the backend.
+
+## 6.3 List Tickets
+
+**GET /api/v1/tickets**
+
+Supported query parameters:
+
+- `status` — optional.
+- `category` — optional.
+- `page` — defaults to 1.
+- `limit` — defaults to 20, maximum 100.
+
+Response:
+
+``` json
+{
+  "data": [],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 0
+  }
+}
+```
+
+Sort by `createdAt DESC, id DESC` for deterministic pagination.
+
+## 6.4 Get Ticket
+
+**GET /api/v1/tickets/:id**
+
+Return the ticket or `404 Not Found`.
+
+Malformed UUIDs should produce `400 Bad Request`.
+
+## 6.5 Update Status
+
+**PATCH /api/v1/tickets/:id/status**
+
+Request:
+
+``` json
+{
+  "status": "IN_PROGRESS"
+}
+```
+
+Response: `200 OK` with the updated ticket.
+
+Return:
+
+- `404` when the ticket does not exist.
+- `409` when the requested status transition is invalid or conflicts with a concurrent update.
+- `400` for malformed input.
+
+## 6.6 List Notifications
+
+**GET /api/v1/notifications**
+
+Return notification records ordered by creation time descending.
+
+Example:
+
+``` json
+{
+  "data": [
+    {
+      "id": "5e8e1ddf-124b-4be3-8dc8-c9f971419aac",
+      "ticketId": "c0a80101-0000-4000-8000-000000000001",
+      "type": "TICKET_CREATED",
+      "message": "Ticket assigned to ENGINEERING_TEAM",
+      "createdAt": "2026-11-10T10:00:01.000Z"
+    }
+  ]
+}
+```
+
+## 6.7 Error Format
+
+All error responses should use a consistent structure:
+
+``` json
+{
+  "error": {
+    "code": "INVALID_STATUS_TRANSITION",
+    "message": "Cannot transition from RESOLVED to OPEN"
+  }
+}
+```
+
+Use global exception mapping to convert domain/application errors into HTTP errors without coupling domain classes to NestJS exceptions.
+
+---
+
+# 7\. Database Design
+
+Use PostgreSQL as the primary database.
+
+Prefer separate logical schemas for Ticket and Notification ownership.
+
+The Routing Module does not require a table because policies are static for this PoC.
+
+## 7.1 tickets.tickets
+
+| Column | Type | Constraints |
+| --- | --- | --- |
+| id | UUID | Primary Key |
+| title | VARCHAR(150) | NOT NULL |
+| description | TEXT | NOT NULL |
+| category | VARCHAR(20) | NOT NULL |
+| priority | VARCHAR(20) | NOT NULL |
+| status | VARCHAR(20) | NOT NULL |
+| assigned\_team\_code | VARCHAR(40) | NOT NULL |
+| created\_at | TIMESTAMPTZ | NOT NULL |
+| updated\_at | TIMESTAMPTZ | NOT NULL |
+
+Add database-level `CHECK` constraints for allowed category, priority, and status values.
+
+The database schema should reinforce basic data integrity while the domain enforces business transition rules.
+
+## 7.2 notifications.notifications
+
+| Column | Type | Constraints |
+| --- | --- | --- |
+| id | UUID | Primary Key |
+| ticket\_id | UUID | NOT NULL |
+| type | VARCHAR(40) | NOT NULL |
+| message | TEXT | NOT NULL |
+| created\_at | TIMESTAMPTZ | NOT NULL |
+
+Do not create a cross-module foreign key from Notification to Ticket for this PoC.
+
+Keep `ticket_id` as a logical reference.
+
+The Notification Module must not query the Ticket Module's table directly.
+
+## 7.3 Database Abstraction
+
+Use Drizzle ORM only inside Infrastructure Adapters.
+
+For example:
+
+``` text
+Ticket Use Case
+      |
+      v
+TicketRepository Port
+      ^
+      |
+DrizzleTicketRepository
+      |
+      v
+PostgreSQL
+```
+
+Domain entities must not expose Drizzle table definitions.
+
+Convert database records to domain objects inside repository adapters.
+
+## 7.4 Migrations
+
+Use Drizzle Kit to generate SQL migrations and Drizzle's PostgreSQL migrator to apply them.
+
+Implement a migration entry point such as:
+
+``` text
+backend/src/db/migrate.ts
+```
+
+It should:
+
+1. Read `DATABASE_URL`.
+2. Create a PostgreSQL connection.
+3. Run pending migrations from the bundled migrations directory.
+4. Close the connection.
+5. Exit nonzero on failure.
+
+Migrations must not depend on an already-initialized developer database.
+
+---
+
+# 8\. Frontend Implementation
+
+## 8.1 Frontend Scope
+
+Create only two main screens.
+
+### Ticket Dashboard
+
+Features:
+
+- Ticket list.
+- Status badges.
+- Priority badges.
+- Assigned team display.
+- Create Ticket form.
+- Filter by ticket status.
+
+### Ticket Detail
+
+Features:
+
+- View Ticket details.
+- View assigned team.
+- Update status using allowed transitions.
+
+Notifications may be displayed in a small dashboard panel instead of a dedicated page.
+
+## 8.2 Frontend Structure
+
+Use feature-based architecture:
+
+``` text
+src/
+├── app/
+├── features/
+│   ├── tickets/
+│   └── notifications/
+└── shared/
+```
+
+Use:
+
+- React Router for navigation if needed.
+- TanStack Query for server state.
+- React Hook Form + Zod for forms.
+- Tailwind CSS for styling.
+
+Avoid Redux or additional state libraries unless clearly necessary.
+
+## 8.3 Frontend Data Flow
+
+``` text
+React Component
+      |
+      v
+TanStack Query Hook
+      |
+      v
+API Client
+      |
+      v
+NestJS REST API
+      |
+      v
+Application Use Case
+```
+
+The frontend does not need to replicate backend Clean Architecture.
+
+Keep the frontend simple and focused on demonstrating the workflow.
+
+## 8.4 UI Acceptance Criteria
+
+- Users can create a ticket.
+- Created tickets appear in the list.
+- Assigned team is visible.
+- Users can open a ticket detail.
+- Users can update a valid ticket status.
+- Invalid updates show understandable errors.
+- Notification records are visible.
+- Loading, empty, and error states are handled.
+
+Do not spend excessive time on animations, elaborate dashboards, or design systems.
+
+---
+
+# 9\. Docker Compose \& Deployment
+
+## 9.1 Services
+
+Use four containers:
+
+| Service | Purpose |
+| --- | --- |
+| frontend | Serve React application |
+| backend | NestJS REST API |
+| db | PostgreSQL |
+| migrate | Apply database migrations and exit |
+
+## 9.2 Required Command
+
+The complete application must start with:
+
+``` bash
+docker compose up --build -d
+```
+
+The reviewer should not need Node.js or PostgreSQL installed locally.
+
+## 9.3 Compose Configuration
+
+Reference design:
+
+``` yaml
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: support_ticket
+      POSTGRES_PASSWORD: support_ticket
+      POSTGRES_DB: support_ticket
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U support_ticket -d support_ticket
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build:
+      context: ./backend
+    command: ["node", "dist/db/migrate.js"]
+    environment:
+      DATABASE_URL: postgres://support_ticket:support_ticket@db:5432/support_ticket
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      PORT: "3000"
+      DATABASE_URL: postgres://support_ticket:support_ticket@db:5432/support_ticket
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - dist/healthcheck.js
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+```
+
+This is a reference configuration. Implementation must include:
+
+- A backend multi-stage Dockerfile.
+- A frontend multi-stage Dockerfile.
+- A small Node.js healthcheck script bundled in the backend image.
+- Database migrations bundled in the backend image.
+- A production build command that places the migration entry point at `dist/db/migrate.js`.
+- Frontend web-server configuration that proxies `/api/*` to `backend:3000`, avoiding browser-origin issues.
+
+Because the database password above is for a disposable local PoC, do not reuse it in shared environments or production.
+
+The backend and migration service should use the same backend image build definition. Use YAML anchors or a shared Compose build configuration if helpful, but do not introduce a registry solely for this assignment.
+
+The reviewer must be able to run the system on a fresh Docker environment.
+
+## 9.4 Health Checks
+
+Implement:
+
+``` text
+GET /health
+```
+
+Return `200 OK` when the backend is initialized and able to serve requests.
+
+A separate readiness check that queries PostgreSQL is optional for the PoC.
+
+## 9.5 Docker Acceptance Criteria
+
+- `docker compose config` succeeds.
+- `docker compose up --build -d` succeeds on a clean environment.
+- Migration container completes successfully.
+- Backend becomes healthy.
+- Frontend loads at `http://localhost:8080`.
+- Frontend requests reach Backend through `/api`.
+- Data persists across container recreation.
+- No manual SQL execution is required.
+
+---
+
+# 10\. Testing Strategy
+
+Testing must prove both business correctness and architectural separation.
+
+## 10.1 Unit Tests
+
+### Ticket Domain
+
+Test:
+
+- Valid ticket creation.
+- Empty title rejection.
+- Invalid category rejection.
+- Invalid priority rejection.
+- Valid state transitions.
+- Invalid state transitions.
+
+### Routing Policy
+
+Test:
+
+| Category | Priority | Expected Team |
+| --- | --- | --- |
+| TECHNICAL | HIGH | ENGINEERING\_TEAM |
+| BILLING | MEDIUM | FINANCE\_TEAM |
+| GENERAL | LOW | SUPPORT\_TEAM |
+| TECHNICAL | CRITICAL | INCIDENT\_TEAM |
+
+### CreateTicket Use Case
+
+Use:
+
+- Fake Ticket Repository.
+- Fake Routing Capability.
+- Fake Notification Capability.
+
+Test:
+
+1. Routing capability is invoked.
+2. Ticket is assigned to the returned team.
+3. Ticket is persisted.
+4. Notification is recorded after successful persistence.
+5. Ticket is not persisted if Routing fails.
+6. Notification is not recorded if persistence fails.
+7. Notification failure does not invalidate a committed Ticket.
+
+## 10.2 Integration Tests
+
+Use a disposable PostgreSQL database, preferably through a test-specific Docker Compose configuration or Testcontainers.
+
+Test:
+
+- Ticket repository insert/read.
+- Ticket status persistence.
+- Notification repository insert/read.
+- Migrations from an empty database.
+
+## 10.3 API Tests
+
+Use Supertest with a bootstrapped NestJS test application.
+
+Test:
+
+- POST `/api/v1/tickets` returns 201.
+- GET ticket returns correct data.
+- GET ticket list supports pagination.
+- PATCH status enforces transitions.
+- Invalid request returns 400 or 422 according to the defined mapping.
+- `/api/docs-json` exposes the OpenAPI document with all business endpoints and `/health`.
+
+## 10.4 Architecture Checks
+
+Add a lightweight static dependency check or document a repeatable manual inspection.
+
+Verify:
+
+- Domain does not import NestJS or Drizzle.
+- Application does not import database adapters.
+- Ticket does not import Routing or Notification infrastructure.
+- Routing does not query Ticket tables.
+- Notification does not query Ticket tables.
+
+Avoid writing a complex custom architecture-testing framework.
+
+---
+
+# 11\. AI-Assisted Development
+
+AI use must be explicit, reviewed, and documented.
+
+## 11.1 AI Workflow
+
+Follow this sequence:
+
+``` text
+Define Requirements
+       |
+       v
+Ask AI for Design Alternatives
+       |
+       v
+Evaluate Proposed Architecture
+       |
+       v
+Choose Design + Record Decision
+       |
+       v
+Implement with AI Assistance
+       |
+       v
+Review Code + Run Tests
+       |
+       v
+Document Findings
+```
+
+## 11.2 Required AI Development Log
+
+Create:
+
+``` text
+docs/ai-development-log.md
+```
+
+For meaningful AI-assisted tasks, document:
+
+- Task.
+- Tool used.
+- Prompt.
+- AI recommendation.
+- Human evaluation.
+- Final decision.
+- Validation evidence.
+- Lessons learned.
+
+Include at least three substantive examples if they occur during development.
+
+Recommended areas:
+
+1. Module boundaries and PBC contract design.
+2. Clean Architecture dependency review.
+3. Test-case generation and error handling.
+
+Do not invent AI conversations or validation results.
+
+## 11.3 Suggested Architecture Prompt
+
+``` text
+Act as a senior software architect.
+
+Review a NestJS Modular Monolith with:
+
+- Ticket Module
+- Routing Module
+- Notification Module
+- PostgreSQL + Drizzle ORM
+
+Requirements:
+- Clean Architecture inside each module
+- Explicit business capability contracts
+- No direct cross-module database access
+- Domain and Application independent of NestJS
+- Minimal complexity suitable for a small PoC
+
+Review:
+1. Module boundaries
+2. Dependency direction
+3. PBC contracts
+4. Hidden coupling
+5. Testability
+6. Overengineering risks
+
+Identify problems and explain trade-offs.
+
+Do not generate code until the design
+has been reviewed and approved.
+```
+
+## 11.4 Suggested Code Review Prompt
+
+``` text
+Review this implementation against
+the architecture specification.
+
+Focus on:
+- Domain business invariants
+- Cross-module boundary violations
+- Dependency inversion
+- Database abstraction
+- Error handling
+- Concurrency and data consistency
+- Missing test cases
+
+Classify findings by severity.
+
+Do not refactor unrelated code.
+Provide evidence for each finding.
+```
+
+## 11.5 Human Review Rules
+
+Never accept generated code solely because it compiles.
+
+Verify:
+
+- Requirement correctness.
+- Business rules.
+- Module boundaries.
+- Error handling.
+- Data persistence.
+- Test assertions.
+- Security-sensitive configuration.
+
+Document at least one meaningful architecture trade-off you personally evaluated.
+
+---
+
+# 12\. Architecture Decision Records
+
+Create `docs/decisions.md`.
+
+Document the following decisions.
+
+### ADR-001: Modular Monolith over Microservices
+
+**Decision:** Deploy one backend process with internal business modules.
+
+**Reason:** Minimize operational complexity while demonstrating business boundaries.
+
+**Trade-off:** Modules cannot scale or deploy independently.
+
+### ADR-002: NestJS as Outer Framework
+
+**Decision:** Use NestJS for HTTP and DI composition only.
+
+**Reason:** Preserve framework-independent business logic.
+
+**Trade-off:** Additional provider wiring and adapters.
+
+### ADR-003: Synchronous Capability Contracts
+
+**Decision:** Use in-process interfaces instead of REST or a message broker between modules.
+
+**Reason:** Simpler communication with explicit contracts.
+
+**Trade-off:** No process-level isolation or independent deployment.
+
+### ADR-004: Best-effort Notification Recording
+
+**Decision:** Record notification after ticket persistence.
+
+**Reason:** Keep the main Ticket operation independent of secondary notification failures.
+
+**Trade-off:** A crash can leave a committed ticket without a notification record.
+
+**Future improvement:** Transactional outbox with retrying worker and idempotent consumption.
+
+### ADR-005: PostgreSQL and Drizzle
+
+**Decision:** Use PostgreSQL with Drizzle-based repository adapters.
+
+**Reason:** Relational integrity and predictable local deployment.
+
+**Trade-off:** Additional mapping between persistence and domain objects.
+
+### ADR-006: No Authentication in MVP
+
+**Decision:** Run a single-user local demonstration without authentication.
+
+**Reason:** Authentication is not required to demonstrate the requested architecture concepts.
+
+**Trade-off:** The system must not be exposed publicly without authentication and authorization.
+
+---
+
+# 13\. Implementation Milestones
+
+## M1 — Foundation
+
+Tasks:
+
+- Initialize repository.
+- Setup React frontend.
+- Setup NestJS backend.
+- Setup PostgreSQL.
+- Configure TypeScript and linting.
+- Create Docker Compose skeleton.
+
+**Exit criteria:** Application builds and basic health endpoint works.
+
+## M2 — Domain and Routing
+
+Tasks:
+
+- Implement Ticket entity.
+- Implement status rules.
+- Implement Routing Policy.
+- Define Routing Capability contract.
+- Create unit tests.
+
+**Exit criteria:** Routing and domain tests pass without database access.
+
+## M3 — Ticket Application
+
+Tasks:
+
+- Implement use cases.
+- Define repository port.
+- Implement CreateTicket orchestration.
+- Implement fake adapters.
+- Test notification failure behavior.
+
+**Exit criteria:** Use cases pass unit tests without NestJS or PostgreSQL.
+
+## M4 — Persistence and API
+
+Tasks:
+
+- Create Drizzle schemas and migrations.
+- Implement PostgreSQL repositories.
+- Implement NestJS controllers.
+- Implement Notification capability.
+- Add integration/API tests.
+
+**Exit criteria:** Ticket creation and retrieval work with PostgreSQL.
+
+## M5 — Frontend and Docker
+
+Tasks:
+
+- Implement Ticket Dashboard.
+- Implement Create Ticket Form.
+- Implement Ticket Detail.
+- Display Notification Records.
+- Add production Dockerfiles.
+- Verify one-command startup.
+
+**Exit criteria:** Main workflow works from the UI in Docker Compose.
+
+## M6 — Architecture Review and Documentation
+
+Tasks:
+
+- Review module boundaries.
+- Verify dependency rules.
+- Complete README.
+- Write ADRs.
+- Complete AI Development Log.
+- Prepare demo script.
+- Test setup from a clean environment.
+
+**Exit criteria:** The project can be demonstrated and explained without relying on AI during the interview.
+
+---
+
+# 14\. Definition of Done
+
+The assignment is complete when:
+
+- [ ] All three business modules have clear responsibilities.
+- [ ] Ticket business rules are enforced in the domain.
+- [ ] Routing uses an explicit public capability contract.
+- [ ] Notification uses an explicit public capability contract.
+- [ ] Use cases do not directly depend on ORM adapters.
+- [ ] No direct cross-module database table access exists.
+- [ ] Users can create, list, and retrieve tickets.
+- [ ] Ticket routing returns the correct team.
+- [ ] Ticket status transitions are enforced.
+- [ ] Swagger UI is available at `/api/docs`, with OpenAPI JSON at `/api/docs-json`.
+- [ ] Important unit and integration tests pass.
+- [ ] Docker Compose starts the full system.
+- [ ] Database migrations run automatically.
+- [ ] README explains setup, architecture, and API usage.
+- [ ] Architecture diagrams show module and dependency boundaries.
+- [ ] AI Development Log includes actual prompts and validations.
+- [ ] Architecture decisions and limitations are documented.
+- [ ] The complete PoC can be explained within the interview time limit.
+
+---
+
+# 15\. Recommended Demo
+
+Prepare a 10–15 minute technical walkthrough.
+
+1. Explain project scope and module responsibilities.
+2. Show Modular Monolith architecture diagram.
+3. Run Docker Compose and open the React UI.
+4. Create a TECHNICAL/HIGH ticket.
+5. Show automatic assignment to ENGINEERING\_TEAM.
+6. Show the resulting notification record.
+7. Update the ticket status.
+8. Demonstrate an invalid status transition.
+9. Open CreateTicket Use Case and Routing Contract.
+10. Run unit tests using fake capability implementations.
+11. Explain one AI-generated suggestion that you evaluated.
+12. Conclude with architecture trade-offs and limitations.
+
+**Main presentation message:**
+
+> This PoC demonstrates how independently understandable business capabilities can be composed inside a single deployable application, while preserving clear dependencies, testability, and controlled implementation complexity.
+
+---
+
+# 16\. Final Engineering Constraints
+
+The implementation must prioritize simplicity and correctness.
+
+Do not add abstractions without an explicit use case.
+
+Do not add a message broker to demonstrate events.
+
+Do not introduce microservices solely to make the architecture appear enterprise-grade.
+
+Do not put business logic inside NestJS controllers.
+
+Do not use Drizzle models as domain entities.
+
+Do not share database repositories between business modules.
+
+Do not generate frontend features outside the defined MVP.
+
+Do not claim notification delivery guarantees that the implementation does not provide.
+
+Do not invent AI validation evidence.
+
+Focus on a small, working, explainable system with clear module boundaries and meaningful tests.
