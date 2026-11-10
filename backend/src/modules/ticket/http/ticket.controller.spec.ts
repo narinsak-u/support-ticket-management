@@ -6,31 +6,40 @@ import { describe, expect, it } from 'vitest';
 import { HttpErrorFilter } from '../../../common/http-exception.filter';
 import { DetermineTeam } from '../../routing/application/determine-team';
 import { Ticket } from '../domain/ticket';
-import { CreateTicket } from '../application/create-ticket';
+import { CreateTicket, GetTicket, ListTickets } from '../application/create-ticket';
 import { CreateTicketDto } from './create-ticket.dto';
 import { TicketController } from './ticket.controller';
 
-describe('POST /api/v1/tickets', () => {
-  it('validates, routes, persists, and records notification for a created ticket', async () => {
-    const persisted: Ticket[] = [];
-    const recordedNotifications: { ticketId: string; title: string; assignedTeamCode: string }[] = [];
-    const createTicket = new CreateTicket(
-      { save: async (ticket) => { persisted.push(ticket); } },
-      new DetermineTeam(),
-      { recordTicketCreated: async (notification) => { recordedNotifications.push(notification); } },
-      { error: () => {} },
-    );
-    Reflect.defineMetadata('design:paramtypes', [CreateTicketDto], TicketController.prototype, 'create');
+function createApp() {
+  const persisted: Ticket[] = [];
+  const createTicket = new CreateTicket(
+    { save: async (ticket) => { persisted.push(ticket); }, list: async (page, limit) => ({ tickets: persisted.slice((page - 1) * limit, page * limit), total: persisted.length }), findById: async (id) => persisted.find((ticket) => ticket.id === id) },
+    new DetermineTeam(),
+    { recordTicketCreated: async () => {} },
+    { error: () => {} },
+  );
+  Reflect.defineMetadata('design:paramtypes', [CreateTicketDto], TicketController.prototype, 'create');
 
-    const module = await Test.createTestingModule({
-      controllers: [TicketController],
-      providers: [{ provide: CreateTicket, useValue: createTicket }],
-    }).compile();
+  return Test.createTestingModule({
+    controllers: [TicketController],
+    providers: [
+      { provide: CreateTicket, useValue: createTicket },
+      { provide: ListTickets, useValue: new ListTickets({ save: async () => {}, list: async (page, limit) => ({ tickets: persisted.slice((page - 1) * limit, page * limit), total: persisted.length }), findById: async (id) => persisted.find((ticket) => ticket.id === id) }) },
+      { provide: GetTicket, useValue: new GetTicket({ save: async () => {}, list: async () => ({ tickets: persisted, total: persisted.length }), findById: async (id) => persisted.find((ticket) => ticket.id === id) }) },
+    ],
+  }).compile().then(async (module) => {
     const app = module.createNestApplication();
     app.setGlobalPrefix('api/v1');
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     app.useGlobalFilters(new HttpErrorFilter());
     await app.init();
+    return app;
+  });
+}
+
+describe('Ticket HTTP API', () => {
+  it('validates, routes, persists, and records notification for a created ticket', async () => {
+    const app = await createApp();
     try {
       await request(app.getHttpServer())
         .post('/api/v1/tickets')
@@ -40,11 +49,18 @@ describe('POST /api/v1/tickets', () => {
           expect(body.assignedTeamCode).toBe('ENGINEERING_TEAM');
           expect(body.status).toBe('OPEN');
         });
-      expect(persisted).toHaveLength(1);
-      expect(persisted[0].assignedTeamCode).toBe('ENGINEERING_TEAM');
-      expect(recordedNotifications).toHaveLength(1);
-      expect(recordedNotifications[0].assignedTeamCode).toBe('ENGINEERING_TEAM');
-
+      await request(app.getHttpServer()).get('/api/v1/tickets').expect(200).expect(({ body }) => {
+        expect(body.data).toHaveLength(1);
+        expect(body.pagination).toEqual({ page: 1, limit: 20, total: 1 });
+      });
+      const created = await request(app.getHttpServer()).get('/api/v1/tickets');
+      await request(app.getHttpServer()).get(`/api/v1/tickets/${created.body.data[0].id}`).expect(200).expect(({ body }) => {
+        expect(body.title).toBe('Cannot sign in');
+        expect(body.description).toBe('');
+        expect(body.assignedTeamCode).toBe('ENGINEERING_TEAM');
+      });
+      await request(app.getHttpServer()).get('/api/v1/tickets/not-a-uuid').expect(400);
+      await request(app.getHttpServer()).get('/api/v1/tickets/00000000-0000-4000-8000-000000000001').expect(404);
       await request(app.getHttpServer())
         .post('/api/v1/tickets')
         .send({ title: '   ', description: '', category: 'TECHNICAL', priority: 'HIGH' })

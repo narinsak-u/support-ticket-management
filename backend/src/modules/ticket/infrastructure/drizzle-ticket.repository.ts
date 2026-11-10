@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { count, desc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../../../db/database.module';
 import { supportTickets } from '../../../db/schema';
-import { Ticket } from '../domain/ticket';
+import { Ticket, TicketCategory, TicketPriority, TicketStatus, TeamCode } from '../domain/ticket';
 import { TicketRepository } from '../application/create-ticket';
 
 @Injectable()
@@ -26,5 +27,35 @@ export class DrizzleTicketRepository implements TicketRepository {
       createdAt: ticket.createdAt,
       updatedAt: ticket.createdAt,
     });
+  }
+
+  async list(page: number, limit: number): Promise<{ tickets: Ticket[]; total: number }> {
+    const [rows, [{ total }]] = await Promise.all([
+      this.db.select().from(supportTickets)
+        .orderBy(desc(supportTickets.createdAt), desc(supportTickets.id))
+        .limit(limit).offset((page - 1) * limit),
+      this.db.select({ total: count() }).from(supportTickets),
+    ]);
+    return {
+      tickets: rows.map((row) => Ticket.reconstitute({
+        ...row,
+        category: row.category as TicketCategory,
+        priority: row.priority as TicketPriority,
+        status: row.status as TicketStatus,
+        assignedTeamCode: row.assignedTeamCode as TeamCode,
+      })),
+      total,
+    };
+  }
+
+  async findById(id: string): Promise<Ticket | undefined> {
+    const [row] = await this.db.select().from(supportTickets).where(eq(supportTickets.id, id)).limit(1);
+    return row ? Ticket.reconstitute({
+      ...row,
+      category: row.category as TicketCategory,
+      priority: row.priority as TicketPriority,
+      status: row.status as TicketStatus,
+      assignedTeamCode: row.assignedTeamCode as TeamCode,
+    }) : undefined;
   }
 }
