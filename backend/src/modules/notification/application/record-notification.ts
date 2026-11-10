@@ -3,14 +3,25 @@ import { NotificationCapability } from '../contracts/notification.contract';
 
 export const NOTIFICATION_RECORD_REPOSITORY = Symbol('NOTIFICATION_RECORD_REPOSITORY');
 
+export interface NotificationRecord {
+  id: string;
+  ticketId: string;
+  type: 'TICKET_CREATED';
+  message: string;
+  createdAt: Date;
+}
+
 export interface NotificationRecordRepository {
-  save(record: {
-    id: string;
-    ticketId: string;
-    type: 'TICKET_CREATED';
-    message: string;
-    createdAt: Date;
-  }): Promise<void>;
+  save(record: NotificationRecord): Promise<void>;
+  findMany(): Promise<NotificationRecord[]>;
+}
+
+export class ListNotifications {
+  constructor(private readonly repository: NotificationRecordRepository) {}
+
+  async execute(): Promise<{ data: NotificationRecord[] }> {
+    return { data: await this.repository.findMany() };
+  }
 }
 
 export class RecordNotification implements NotificationCapability {
