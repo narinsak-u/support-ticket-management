@@ -20,8 +20,8 @@ export class TicketInputError extends Error {
 export class InvalidStatusTransitionError extends Error {
   readonly code = 'INVALID_STATUS_TRANSITION';
 
-  constructor() {
-    super('Ticket status transition is not allowed');
+  constructor(current: TicketStatus, next: TicketStatus) {
+    super(`Cannot transition from ${current} to ${next}`);
     this.name = 'InvalidStatusTransitionError';
   }
 }
@@ -68,7 +68,7 @@ export class Ticket {
 
   transitionTo(status: TicketStatus): Ticket {
     const nextStatus: Partial<Record<TicketStatus, TicketStatus>> = { OPEN: 'IN_PROGRESS', IN_PROGRESS: 'RESOLVED' };
-    if (nextStatus[this.status] !== status) throw new InvalidStatusTransitionError();
+    if (nextStatus[this.status] !== status) throw new InvalidStatusTransitionError(this.status, status);
     return new Ticket(this.id, this.title, this.description, this.category, this.priority, status, this.assignedTeamCode, this.createdAt);
   }
 

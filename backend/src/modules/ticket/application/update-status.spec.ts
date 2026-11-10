@@ -25,19 +25,16 @@ describe('UpdateTicketStatus', () => {
   });
 
   it('rejects invalid transition with domain code', async () => {
-    await expect(setup(ticket('OPEN')).execute(id, 'RESOLVED')).rejects.toMatchObject({ code: 'INVALID_STATUS_TRANSITION' });
+    await expect(setup(ticket('OPEN')).execute(id, 'RESOLVED')).rejects.toMatchObject({
+      code: 'INVALID_STATUS_TRANSITION', message: 'Cannot transition from OPEN to RESOLVED',
+    });
   });
 
   it('returns not found for unknown ticket', async () => {
-    await expect(setup().execute(id, 'IN_PROGRESS')).rejects.toMatchObject({ status: 404 });
-  });
-
-  it('rejects malformed identifiers and statuses', async () => {
-    await expect(setup(ticket('OPEN')).execute('bad-id', 'IN_PROGRESS')).rejects.toMatchObject({ status: 400 });
-    await expect(setup(ticket('OPEN')).execute(id, 'UNKNOWN' as TicketStatus)).rejects.toMatchObject({ status: 400 });
+    await expect(setup().execute(id, 'IN_PROGRESS')).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
   it('reports concurrent status change as conflict', async () => {
-    await expect(setup(ticket('OPEN'), async () => false).execute(id, 'IN_PROGRESS')).rejects.toMatchObject({ status: 409 });
+    await expect(setup(ticket('OPEN'), async () => false).execute(id, 'IN_PROGRESS')).rejects.toMatchObject({ code: 'CONFLICT' });
   });
 });

@@ -8,6 +8,7 @@ import { DetermineTeam } from '../../routing/application/determine-team';
 import { Ticket } from '../domain/ticket';
 import { CreateTicket, GetTicket, ListTicketQuery, ListTickets, TicketRepository } from '../application/create-ticket';
 import { CreateTicketDto } from './create-ticket.dto';
+import { ListQueryDto } from './list-query.dto';
 import { TicketController } from './ticket.controller';
 
 function createApp() {
@@ -29,6 +30,7 @@ function createApp() {
     { error: () => {} },
   );
   Reflect.defineMetadata('design:paramtypes', [CreateTicketDto], TicketController.prototype, 'create');
+  Reflect.defineMetadata('design:paramtypes', [ListQueryDto], TicketController.prototype, 'list');
 
   return Test.createTestingModule({
     controllers: [TicketController],
@@ -98,11 +100,12 @@ describe('Ticket HTTP API', () => {
       const firstPage = await request(app.getHttpServer())
         .get('/api/v1/tickets?status=OPEN&category=TECHNICAL&page=1&limit=1').expect(200);
       expect(firstPage.body.pagination).toEqual({ page: 1, limit: 1, total: 2 });
-      expect(firstPage.body.data.map((ticket: Ticket) => ticket.title)).toEqual(['Technical two']);
 
       const secondPage = await request(app.getHttpServer())
         .get('/api/v1/tickets?status=OPEN&category=TECHNICAL&page=2&limit=1').expect(200);
-      expect(secondPage.body.data.map((ticket: Ticket) => ticket.title)).toEqual(['Technical one']);
+      const [first, second] = [firstPage.body.data[0], secondPage.body.data[0]];
+      expect([first.title, second.title].sort()).toEqual(['Technical one', 'Technical two']);
+      expect(first.createdAt > second.createdAt || (first.createdAt === second.createdAt && first.id > second.id)).toBe(true);
       const unfiltered = await request(app.getHttpServer())
         .get('/api/v1/tickets?category=&status=').expect(200);
       expect(unfiltered.body.pagination.total).toBe(3);

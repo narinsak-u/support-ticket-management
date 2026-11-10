@@ -5,6 +5,8 @@ import { NewTicket, Ticket, TicketCategory, TicketStatus } from '../domain/ticke
 export interface ApplicationLogger {
   error(message: string, error: unknown): void;
 }
+export const TICKET_REPOSITORY = Symbol('TICKET_REPOSITORY');
+
 
 export interface ListTicketQuery {
   status?: TicketStatus;

@@ -20,6 +20,7 @@ export class TicketController {
     return this.createTicket.execute(input);
   }
 
+  @Get()
   list(@Query() query: ListQueryDto) {
     return this.listTickets.execute(query);
   }

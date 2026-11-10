@@ -1,5 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
 import { InvalidStatusTransitionError, TicketInputError } from '../modules/ticket/domain/ticket';
+import { TicketStatusUseCaseError } from '../modules/ticket/application/update-status';
 
 @Catch()
 export class HttpErrorFilter implements ExceptionFilter {
@@ -15,6 +16,10 @@ export class HttpErrorFilter implements ExceptionFilter {
       message = exception.message;
     } else if (exception instanceof InvalidStatusTransitionError) {
       status = HttpStatus.CONFLICT;
+      code = exception.code;
+      message = exception.message;
+    } else if (exception instanceof TicketStatusUseCaseError) {
+      status = exception.code === 'NOT_FOUND' ? HttpStatus.NOT_FOUND : HttpStatus.CONFLICT;
       code = exception.code;
       message = exception.message;
     } else if (exception instanceof HttpException) {

@@ -78,7 +78,7 @@ function App() {
   });
   const tickets = ticketQuery.data?.data ?? [];
   const notifications = notificationQuery.data?.data ?? [];
-  const activeId = tickets.some((ticket) => ticket.id === selectedId) ? selectedId : tickets[0]?.id ?? null;
+  const activeId = selectedId ?? tickets[0]?.id ?? null;
   const detailQuery = useQuery({
     queryKey: ['ticket', activeId],
     queryFn: () => requestJson<Ticket>(`/api/v1/tickets/${activeId}`),

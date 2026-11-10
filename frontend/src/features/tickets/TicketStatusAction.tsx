@@ -26,8 +26,8 @@ export function TicketStatusAction({ ticketId, status, onChanged }: TicketStatus
       });
       if (!response.ok) {
         if (response.status >= 500) throw new Error('Could not update ticket status. Try again.');
-        const body = await response.json().catch(() => null) as { message?: string | string[] } | null;
-        const message = Array.isArray(body?.message) ? body.message.join(' ') : body?.message;
+        const body = await response.json().catch(() => null) as { error?: { message?: string }; message?: string | string[] } | null;
+        const message = body?.error?.message ?? (Array.isArray(body?.message) ? body.message.join(' ') : body?.message);
         throw new Error(message || (response.status === 409
           ? 'Ticket status changed elsewhere. Refresh and try again.'
           : 'Could not update ticket status.'));
