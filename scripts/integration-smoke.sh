@@ -29,14 +29,30 @@ id=$("${compose[@]}" exec -T backend node -e 'const t=JSON.parse(process.argv[1]
 list=$(curl --fail --silent --show-error "$base/tickets")
 detail=$(curl --fail --silent --show-error "$base/tickets/$id")
 notifications=$(curl --fail --silent --show-error "$base/notifications")
-"${compose[@]}" exec -T backend node - "$created" "$list" "$detail" "$notifications" "$id" <<'NODE'
+progress=$(curl --fail --silent --show-error -X PATCH -H 'content-type: application/json' \
+  -d '{"status":"IN_PROGRESS"}' "$base/tickets/$id/status")
+resolved=$(curl --fail --silent --show-error -X PATCH -H 'content-type: application/json' \
+  -d '{"status":"RESOLVED"}' "$base/tickets/$id/status")
+after=$(curl --fail --silent --show-error "$base/tickets/$id")
+filtered=$(curl --fail --silent --show-error "$base/tickets?status=RESOLVED&category=BILLING&page=1&limit=1")
+invalid=$(curl --silent --output /dev/null --write-out '%{http_code}' -X PATCH -H 'content-type: application/json' \
+  -d '{"status":"OPEN"}' "$base/tickets/$id/status")
+bounded=$(curl --silent --output /dev/null --write-out '%{http_code}' "$base/tickets?limit=101")
+"${compose[@]}" exec -T backend node - "$created" "$list" "$detail" "$notifications" "$id" "$progress" "$resolved" "$after" "$filtered" "$invalid" "$bounded" <<'NODE'
 const [created, list, detail, notifications] = process.argv.slice(2, 6).map(JSON.parse);
 const id = process.argv[6];
+const [progress, resolved, after, filtered] = process.argv.slice(7, 11).map(JSON.parse);
+const [invalid, bounded] = process.argv.slice(11, 13);
 if (!list.data.some(ticket => ticket.id === id)) throw new Error('Ticket absent from list');
 if (detail.id !== id || detail.title !== created.title) throw new Error('Ticket detail mismatch');
 if (!notifications.data.some(record => record.ticketId === id && record.type === 'TICKET_CREATED')) {
   throw new Error('Persisted notification absent');
 }
+if (progress.status !== 'IN_PROGRESS' || resolved.status !== 'RESOLVED' || after.status !== 'RESOLVED') {
+  throw new Error('Status transition was not persisted');
+}
+if (filtered.pagination.total !== 1 || filtered.data[0]?.id !== id) throw new Error('Filtered list missed updated ticket');
+if (invalid !== '409' || bounded !== '400') throw new Error('Status or page limit validation mismatch');
 NODE
 
-echo "Fresh-database ticket and notification persistence passed ($id)"
+echo "Fresh-database ticket, status and notification persistence passed ($id)"
