@@ -17,6 +17,15 @@ export class TicketInputError extends Error {
   }
 }
 
+export class InvalidStatusTransitionError extends Error {
+  readonly code = 'INVALID_STATUS_TRANSITION';
+
+  constructor() {
+    super('Ticket status transition is not allowed');
+    this.name = 'InvalidStatusTransitionError';
+  }
+}
+
 export interface NewTicket {
   title: string;
   description: string;
@@ -57,9 +66,16 @@ export class Ticket {
     return new Ticket(input.id, input.title, input.description, input.category, input.priority, input.status, input.assignedTeamCode, input.createdAt);
   }
 
+  transitionTo(status: TicketStatus): Ticket {
+    const nextStatus: Partial<Record<TicketStatus, TicketStatus>> = { OPEN: 'IN_PROGRESS', IN_PROGRESS: 'RESOLVED' };
+    if (nextStatus[this.status] !== status) throw new InvalidStatusTransitionError();
+    return new Ticket(this.id, this.title, this.description, this.category, this.priority, status, this.assignedTeamCode, this.createdAt);
+  }
+
   static create(input: NewTicket): Ticket {
     this.validateInput(input);
     if (!TEAM_CODES.includes(input.assignedTeamCode)) throw new TicketInputError('Assigned team is invalid');
     return new Ticket(randomUUID(), input.title, input.description, input.category, input.priority, 'OPEN', input.assignedTeamCode, new Date());
   }
+
 }
