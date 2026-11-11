@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { desc } from 'drizzle-orm';
+import { count, desc } from 'drizzle-orm';
 import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../../../db/database.module';
 import { notificationRecords } from '../../../db/schema';
-import { NotificationRecord, NotificationRecordRepository } from '../application/record-notification';
+import { NotificationListQuery, NotificationRecord, NotificationRecordRepository } from '../application/record-notification';
 
 const notificationSchema = { notificationRecords };
 
@@ -20,10 +20,13 @@ export class DrizzleNotificationRepository implements NotificationRecordReposito
     await this.db.insert(notificationRecords).values(record);
   }
 
-  findMany(): Promise<NotificationRecord[]> {
-    return this.db.select().from(notificationRecords).orderBy(
-      desc(notificationRecords.createdAt),
-      desc(notificationRecords.id),
-    );
+  async list(query: NotificationListQuery): Promise<{ data: NotificationRecord[]; total: number }> {
+    const [data, [{ total }]] = await Promise.all([
+      this.db.select().from(notificationRecords)
+        .orderBy(desc(notificationRecords.createdAt), desc(notificationRecords.id))
+        .limit(query.limit).offset((query.page - 1) * query.limit),
+      this.db.select({ total: count() }).from(notificationRecords),
+    ]);
+    return { data, total };
   }
 }

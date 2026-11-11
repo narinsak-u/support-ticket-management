@@ -14,7 +14,7 @@ export class TicketResponseDto {
 
 export class PaginationResponseDto {
   @ApiProperty({ type: Number, minimum: 1, example: 1 }) page!: number;
-  @ApiProperty({ type: Number, minimum: 1, maximum: 100, example: 20 }) limit!: number;
+  @ApiProperty({ type: Number, minimum: 1, maximum: 100, example: 5 }) limit!: number;
   @ApiProperty({ type: Number, minimum: 0 }) total!: number;
 }
 
@@ -33,6 +33,7 @@ export class NotificationResponseDto {
 
 export class NotificationListResponseDto {
   @ApiProperty({ type: NotificationResponseDto, isArray: true }) data!: NotificationResponseDto[];
+  @ApiProperty({ type: PaginationResponseDto }) pagination!: PaginationResponseDto;
 }
 
 export class HealthResponseDto {

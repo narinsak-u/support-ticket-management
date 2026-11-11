@@ -63,7 +63,7 @@ describe('Ticket HTTP API', () => {
         });
       await request(app.getHttpServer()).get('/api/v1/tickets').expect(200).expect(({ body }) => {
         expect(body.data).toHaveLength(1);
-        expect(body.pagination).toEqual({ page: 1, limit: 20, total: 1 });
+        expect(body.pagination).toEqual({ page: 1, limit: 5, total: 1 });
       });
       const created = await request(app.getHttpServer()).get('/api/v1/tickets');
       await request(app.getHttpServer()).get(`/api/v1/tickets/${created.body.data[0].id}`).expect(200).expect(({ body }) => {

@@ -658,7 +658,7 @@ Supported query parameters:
 - `status` — optional.
 - `category` — optional.
 - `page` — defaults to 1.
-- `limit` — defaults to 20, maximum 100.
+- `limit` — defaults to 5, maximum 100.
 
 Response:
 
@@ -667,7 +667,7 @@ Response:
   "data": [],
   "pagination": {
     "page": 1,
-    "limit": 20,
+    "limit": 5,
     "total": 0
   }
 }
@@ -707,7 +707,10 @@ Return:
 
 **GET /api/v1/notifications**
 
-Return notification records ordered by creation time descending.
+- `page` — defaults to 1.
+- `limit` — defaults to 5, maximum 100.
+
+Return notification records ordered by creation time descending, with pagination metadata.
 
 Example:
 
@@ -721,7 +724,12 @@ Example:
       "message": "Ticket assigned to ENGINEERING_TEAM",
       "createdAt": "2026-11-10T10:00:01.000Z"
     }
-  ]
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 5,
+    "total": 1
+  }
 }
 ```
 
@@ -908,7 +916,7 @@ Keep the frontend simple and focused on demonstrating the workflow.
 - Users can open a ticket detail.
 - Users can update a valid ticket status.
 - Invalid updates show understandable errors.
-- Notification records are visible.
+- Ticket and Notification lists show five records per page, with independent pagination controls.
 - Loading, empty, and error states are handled.
 
 Do not spend excessive time on animations, elaborate dashboards, or design systems.
@@ -937,6 +945,8 @@ docker compose up --build -d
 ```
 
 The reviewer should not need Node.js or PostgreSQL installed locally.
+
+After migrations, the backend creates five representative support tickets when the Ticket table is empty. Existing ticket data prevents reseeding on later starts.
 
 ## 9.3 Compose Configuration
 

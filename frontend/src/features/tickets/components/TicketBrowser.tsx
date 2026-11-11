@@ -2,7 +2,7 @@ import { useTicketBrowser } from "../hooks/useTicketBrowser";
 import { TicketDetailPanel } from "./TicketDetailPanel";
 import { TicketFilters } from "./TicketFilters";
 import { TicketList } from "./TicketList";
-import { TicketPagination } from "./TicketPagination";
+import { PaginationControls } from "../../../shared/ui/PaginationControls";
 
 type TicketBrowserProps = {
   selectedId: string | null;
@@ -42,7 +42,8 @@ export function TicketBrowser({
             error={browser.listError}
             onSelectTicket={browser.onSelectTicket}
           />
-          <TicketPagination
+          <PaginationControls
+            ariaLabel="Ticket pages"
             page={browser.page}
             total={browser.total}
             limit={browser.limit}

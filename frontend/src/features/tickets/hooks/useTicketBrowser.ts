@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { DEFAULT_PAGE_SIZE } from "../../../shared/pagination";
 import { getTicket, listTickets } from "../api/tickets";
 
 type UseTicketBrowserOptions = {
@@ -15,7 +16,7 @@ export function useTicketBrowser({
   const [category, setCategory] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
-  const limit = 20;
+  const limit = DEFAULT_PAGE_SIZE;
   const ticketQuery = useQuery({
     queryKey: ["tickets", { category, status, page, limit }],
     queryFn: () => listTickets(category, status, page, limit),

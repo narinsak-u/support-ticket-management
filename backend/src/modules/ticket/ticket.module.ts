@@ -9,12 +9,14 @@ import { RoutingModule } from '../routing/routing.module';
 import { ROUTING_CAPABILITY } from '../routing/contracts/routing.contract';
 import { CreateTicket, GetTicket, ListTickets, TICKET_REPOSITORY } from './application/create-ticket';
 import { DrizzleTicketRepository } from './infrastructure/drizzle-ticket.repository';
+import { TicketSeeder } from './infrastructure/ticket-seeder';
 import { TicketController } from './http/ticket.controller';
 
 @Module({
   imports: [DatabaseModule, RoutingModule, NotificationModule],
   controllers: [TicketController],
   providers: [
+    TicketSeeder,
     DrizzleTicketRepository,
     Logger,
     { provide: TICKET_REPOSITORY, useExisting: DrizzleTicketRepository },

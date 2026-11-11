@@ -4,10 +4,13 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import request = require('supertest');
 import { describe, expect, it } from 'vitest';
 import { AppModule } from './app.module';
+import { TicketSeeder } from './modules/ticket/infrastructure/ticket-seeder';
 
 describe('Public OpenAPI document', () => {
   it('publishes every route with request, response, filter, and error schemas', async () => {
-    const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const module = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(TicketSeeder).useValue({})
+      .compile();
     const app = module.createNestApplication();
     app.setGlobalPrefix('api/v1', { exclude: ['health'] });
     const document = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle('Support Ticket API').setVersion('1.0').build());
@@ -40,8 +43,17 @@ describe('Public OpenAPI document', () => {
       expect(Object.keys(patch.responses).sort()).toEqual(['200', '400', '404', '409', '500']);
       expect(patch.responses['409'].content['application/json'].schema.$ref)
         .toBe('#/components/schemas/ErrorEnvelopeDto');
+      expect(paths['/api/v1/notifications'].get.parameters.map((param: { name: string }) => param.name).sort())
+        .toEqual(['limit', 'page']);
+      const notificationLimit = paths['/api/v1/notifications'].get.parameters
+        .find((param: { name: string }) => param.name === 'limit');
+      expect(notificationLimit.schema).toMatchObject({ maximum: 100, example: 5 });
       expect(paths['/api/v1/notifications'].get.responses['200'].content['application/json'].schema.$ref)
         .toBe('#/components/schemas/NotificationListResponseDto');
+      expect(body.components.schemas.NotificationListResponseDto.properties.pagination.$ref)
+        .toBe('#/components/schemas/PaginationResponseDto');
+      expect(paths['/api/v1/notifications'].get.responses['400'].content['application/json'].schema.$ref)
+        .toBe('#/components/schemas/ErrorEnvelopeDto');
       expect(paths['/health'].get.responses['200'].content['application/json'].schema.$ref)
         .toBe('#/components/schemas/HealthResponseDto');
       expect(body.components.schemas.TicketResponseDto.properties.assignedTeamCode.enum)

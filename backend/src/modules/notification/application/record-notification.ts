@@ -11,16 +11,24 @@ export interface NotificationRecord {
   createdAt: Date;
 }
 
+export interface NotificationListQuery {
+  page: number;
+  limit: number;
+}
+
 export interface NotificationRecordRepository {
   save(record: NotificationRecord): Promise<void>;
-  findMany(): Promise<NotificationRecord[]>;
+  list(query: NotificationListQuery): Promise<{ data: NotificationRecord[]; total: number }>;
 }
 
 export class ListNotifications {
   constructor(private readonly repository: NotificationRecordRepository) {}
 
-  async execute(): Promise<{ data: NotificationRecord[] }> {
-    return { data: await this.repository.findMany() };
+  async execute(query: { page?: number; limit?: number } = {}) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 5;
+    const { data, total } = await this.repository.list({ page, limit });
+    return { data, pagination: { page, limit, total } };
   }
 }
 

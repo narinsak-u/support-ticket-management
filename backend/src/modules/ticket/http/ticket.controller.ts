@@ -29,7 +29,7 @@ export class TicketController {
   @ApiQuery({ name: 'status', required: false, enum: ['OPEN', 'IN_PROGRESS', 'RESOLVED'] })
   @ApiQuery({ name: 'category', required: false, enum: TICKET_CATEGORIES })
   @ApiQuery({ name: 'page', required: false, type: Number, minimum: 1, example: 1 })
-  @ApiQuery({ name: 'limit', required: false, type: Number, minimum: 1, maximum: 100, example: 20 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, minimum: 1, maximum: 100, example: 5 })
   @ApiOkResponse({ type: TicketListResponseDto })
   list(@Query() query: ListQueryDto) {
     return this.listTickets.execute(query);

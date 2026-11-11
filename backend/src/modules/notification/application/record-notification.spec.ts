@@ -7,7 +7,7 @@ import {
 describe('RecordNotification', () => {
   it('stores the ticket creation assignment with an ID and timestamp', async () => {
     const save = vi.fn<NotificationRecordRepository['save']>().mockResolvedValue();
-    const recorder = new RecordNotification({ save, findMany: async () => [] });
+    const recorder = new RecordNotification({ save, list: async () => ({ data: [], total: 0 }) });
 
     await recorder.recordTicketCreated({
       ticketId: '8d7dca0e-b858-4bb2-9367-cab72c012345',
@@ -28,7 +28,7 @@ describe('RecordNotification', () => {
   it('propagates persistence failures', async () => {
     const failure = new Error('database unavailable');
     const save = vi.fn<NotificationRecordRepository['save']>().mockRejectedValue(failure);
-    const recorder = new RecordNotification({ save, findMany: async () => [] });
+    const recorder = new RecordNotification({ save, list: async () => ({ data: [], total: 0 }) });
 
     await expect(
       recorder.recordTicketCreated({

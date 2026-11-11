@@ -47,7 +47,7 @@ export class ListTickets {
 
   async execute(query: { status?: TicketStatus; category?: TicketCategory; page?: number; limit?: number } = {}) {
     const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const limit = query.limit ?? 5;
     const { tickets, total } = await this.tickets.list({ ...query, page, limit });
     return { data: tickets, pagination: { page, limit, total } };
   }

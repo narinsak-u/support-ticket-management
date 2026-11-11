@@ -1,4 +1,5 @@
-type TicketPaginationProps = {
+type PaginationControlsProps = {
+  ariaLabel: string;
   page: number;
   total: number;
   limit: number;
@@ -6,15 +7,16 @@ type TicketPaginationProps = {
   onPageChange: (page: number) => void;
 };
 
-export function TicketPagination({
+export function PaginationControls({
+  ariaLabel,
   page,
   total,
   limit,
   isFetching,
   onPageChange,
-}: TicketPaginationProps) {
+}: PaginationControlsProps) {
   return (
-    <nav className="pagination-controls" aria-label="Ticket pages">
+    <nav className="pagination-controls" aria-label={ariaLabel}>
       <button
         type="button"
         onClick={() => onPageChange(page - 1)}

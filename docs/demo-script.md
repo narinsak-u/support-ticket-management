@@ -40,9 +40,9 @@ The response should report `OPEN` and `ENGINEERING_TEAM` for TECHNICAL/HIGH. If 
 Show the ticket in the UI list, select it, and point out its detail fields and assigned team. Show its notification record in the activity panel. These commands inspect the same records:
 
 ```sh
-curl -fsS 'http://localhost:3000/api/v1/tickets?category=TECHNICAL&status=OPEN&page=1&limit=20' | jq .
+curl -fsS 'http://localhost:3000/api/v1/tickets?category=TECHNICAL&status=OPEN&page=1&limit=5' | jq .
 curl -fsS "http://localhost:3000/api/v1/tickets/$TICKET_ID" | jq .
-curl -fsS http://localhost:3000/api/v1/notifications | jq .
+curl -fsS 'http://localhost:3000/api/v1/notifications?page=1&limit=5' | jq .
 ```
 
 ### 6:00–8:00 — Allowed and rejected transitions
