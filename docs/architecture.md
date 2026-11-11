@@ -37,6 +37,10 @@ flowchart LR
 
 The frontend calls business endpoints under `/api/v1`; health is `/health`. Swagger UI and its generated OpenAPI JSON are `/api/docs` and `/api/docs-json`. Compose runs `db`, `migrate`, `backend`, and `frontend`; the backend waits for database health and successful migration. Compose publishes frontend and API on `127.0.0.1:8080` and `127.0.0.1:3000`.
 
+## Frontend feature layout
+
+`main.tsx` mounts the app. `app/` owns providers, the dashboard shell, selected-ticket coordination, and cache invalidation across features. `features/tickets/` owns ticket validation and types, API calls, the create form, browsing, details, and status actions. `features/notifications/` owns notification retrieval and its dashboard panel. Existing global styles remain in `style.css`; there is no `shared/` module until both features need the same code.
+
 ## Business contexts and contracts
 
 - **Ticket** owns ticket lifecycle, validation and status transitions, ticket HTTP endpoints, and `tickets.tickets`. Its application layer handles create, list, retrieve, and status update use cases. `TicketRepository` and `TicketStatusRepository` are ports; Drizzle adapters map persistence records to domain objects.
