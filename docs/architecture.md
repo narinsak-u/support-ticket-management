@@ -35,11 +35,14 @@ flowchart LR
   end
 ```
 
-The frontend calls business endpoints under `/api/v1`; health is `/health`. Swagger UI and its generated OpenAPI JSON are `/api/docs` and `/api/docs-json`. Compose runs `db`, `migrate`, `backend`, and `frontend`; the backend waits for database health and successful migration. Compose publishes frontend and API on `127.0.0.1:8080` and `127.0.0.1:3000`.
+The frontend calls the backend directly at its configured `VITE_API_URL` origin and uses `/api/v1` for business endpoints. The backend allowlists frontend origins through `CORS_ORIGIN`. Compose runs the Vite frontend, `db`, `migrate`, and backend; the backend waits for database health and successful migration. Compose publishes frontend and API on `127.0.0.1:5173` and `127.0.0.1:3000`.
 
-## Frontend feature layout
+The frontend URL is read by Vite at runtime from `VITE_API_URL`; the default is `http://localhost:3000`. Set `CORS_ORIGIN` to the exact frontend origin(s) on the backend. Defaults allow `http://localhost:5173` and `http://127.0.0.1:5173`. The comma-separated origin list does not include paths. The Compose frontend uses Vite's development server; do not expose it as a production deployment.
 
-`main.tsx` mounts the app. `app/` owns providers, the dashboard shell, selected-ticket coordination, and cache invalidation across features. `features/tickets/` owns ticket validation and types, API calls, the create form, browsing, details, and status actions. `features/notifications/` owns notification retrieval and its dashboard panel. Existing global styles remain in `style.css`; there is no `shared/` module until both features need the same code.
+CORS only controls browser access to responses; it does not authenticate API requests.
+
+`main.tsx` mounts the app. `app/` owns providers, the dashboard shell, selected-ticket coordination, and cache invalidation across features. `features/tickets/` owns ticket validation and types, API calls, the create form, browsing, details, and status actions. `features/notifications/` owns notification retrieval and its dashboard panel. `shared/api/` owns the API origin used by both features; styles remain in `style.css`.
+
 
 ## Business contexts and contracts
 

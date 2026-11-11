@@ -12,13 +12,22 @@ docker compose up --build -d
 
 Compose starts four services: `db`, `migrate`, `backend`, and `frontend`. The migration service applies pending Drizzle migrations before the backend starts. PostgreSQL data lives in the named `postgres_data` volume and survives container recreation.
 
-- Dashboard: <http://localhost:8080>
+- Dashboard: <http://localhost:5173>
 - API: <http://localhost:3000/api/v1>
 - Swagger UI: <http://localhost:3000/api/docs>
 - OpenAPI JSON: <http://localhost:3000/api/docs-json>
 - Health: <http://localhost:3000/health>
 
 Both published ports bind to `127.0.0.1`. This unauthenticated demo is not safe for public exposure.
+
+## Separate frontend and API
+
+The frontend runs the Vite development server in its container and calls the backend directly. Copy `.env.example` to `.env` to override:
+
+- `VITE_API_URL`: backend origin used by the frontend. Default: `http://localhost:3000`.
+- `CORS_ORIGIN`: comma-separated frontend origins allowed by the backend. Defaults to `http://localhost:5173` and `http://127.0.0.1:5173`.
+
+Restart the frontend after changing `VITE_API_URL`: `docker compose up -d frontend`. For separate deployments, set `VITE_API_URL` to the public backend origin and `CORS_ORIGIN` to the frontend origin. CORS origins are origins only: scheme, host, and optional port; no path. Vite's development server is for this local proof of concept, not production hosting.
 
 Example: create a ticket through the API.
 

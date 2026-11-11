@@ -977,6 +977,7 @@ services:
     environment:
       PORT: "3000"
       DATABASE_URL: postgres://support_ticket:support_ticket@db:5432/support_ticket
+      CORS_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -994,12 +995,12 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-    depends_on:
-      backend:
-        condition: service_healthy
+      context: .
+      dockerfile: frontend/Dockerfile
+    environment:
+      VITE_API_URL: http://localhost:3000
     ports:
-      - "8080:80"
+      - "127.0.0.1:5173:5173"
     restart: unless-stopped
 
 volumes:
@@ -1009,11 +1010,11 @@ volumes:
 This is a reference configuration. Implementation must include:
 
 - A backend multi-stage Dockerfile.
-- A frontend multi-stage Dockerfile.
+- A frontend Dockerfile that runs the Vite development server on port 5173.
 - A small Node.js healthcheck script bundled in the backend image.
 - Database migrations bundled in the backend image.
 - A production build command that places the migration entry point at `dist/db/migrate.js`.
-- Frontend web-server configuration that proxies `/api/*` to `backend:3000`, avoiding browser-origin issues.
+- A configurable frontend API origin and backend CORS allowlist for separate frontend and backend deployments.
 
 Because the database password above is for a disposable local PoC, do not reuse it in shared environments or production.
 
@@ -1039,8 +1040,8 @@ A separate readiness check that queries PostgreSQL is optional for the PoC.
 - `docker compose up --build -d` succeeds on a clean environment.
 - Migration container completes successfully.
 - Backend becomes healthy.
-- Frontend loads at `http://localhost:8080`.
-- Frontend requests reach Backend through `/api`.
+- Frontend loads at `http://localhost:5173`.
+- Frontend requests reach the Backend directly at the configured API origin, allowed by backend CORS.
 - Data persists across container recreation.
 - No manual SQL execution is required.
 

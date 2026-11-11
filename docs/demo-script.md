@@ -12,7 +12,7 @@ docker compose ps --all
 curl -fsS http://localhost:3000/health
 ```
 
-Open <http://localhost:8080>. The services are `db`, `migrate` (runs and exits), `backend`, and `frontend`. The UI uses the frontend proxy for `/api`; direct API commands below use port 3000.
+Open <http://localhost:5173>. The services are `db`, `migrate` (runs and exits), `backend`, and `frontend`. The frontend calls the backend directly at its configured `VITE_API_URL`; CORS allows its origin. Direct API commands below use port 3000.
 
 ## Walkthrough
 

@@ -1,3 +1,4 @@
+import { apiUrl } from '../../../shared/api/client';
 type NotificationRecord = {
   id: string;
   ticketId: string;
@@ -9,7 +10,7 @@ type NotificationRecord = {
 export async function getNotifications(): Promise<{
   data: NotificationRecord[];
 }> {
-  const response = await fetch("/api/v1/notifications");
+  const response = await fetch(apiUrl('/api/v1/notifications'));
   if (!response.ok) throw new Error("Could not load notifications. Try again.");
   return response.json() as Promise<{ data: NotificationRecord[] }>;
 }

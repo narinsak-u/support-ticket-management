@@ -9,16 +9,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"${compose[@]}" up --build -d frontend
+"${compose[@]}" up --build -d backend frontend
 address=$("${compose[@]}" port backend 3000)
 port=${address##*:}
 base="http://127.0.0.1:$port/api/v1"
-frontendAddress=$("${compose[@]}" port frontend 80)
+frontendAddress=$("${compose[@]}" port frontend 5173)
 frontendPort=${frontendAddress##*:}
+frontend="http://127.0.0.1:$frontendPort"
 for attempt in {1..60}; do
   if curl --fail --silent "$base/notifications" >/dev/null &&
-    curl --fail --silent "http://127.0.0.1:$frontendPort/health" >/dev/null &&
-    curl --fail --silent "http://127.0.0.1:$frontendPort/" >/dev/null; then break; fi
+    curl --fail --silent "$frontend/" >/dev/null &&
+    curl --fail --silent "$frontend/@vite/client" >/dev/null; then break; fi
   if (( attempt == 60 )); then
     echo "Full stack did not become ready" >&2
     exit 1

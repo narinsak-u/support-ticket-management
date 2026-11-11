@@ -1,4 +1,5 @@
 import type { Ticket, TicketInput } from "../types";
+import { apiUrl } from '../../../shared/api/client';
 
 async function requestJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
@@ -16,16 +17,16 @@ export async function listTickets(
     data: Ticket[];
     pagination: { page: number; limit: number; total: number };
   }>(
-    `/api/v1/tickets?category=${category}&status=${status}&page=${page}&limit=${limit}`,
+    apiUrl(`/api/v1/tickets?category=${category}&status=${status}&page=${page}&limit=${limit}`),
   );
 }
 
 export async function getTicket(id: string) {
-  return requestJson<Ticket>(`/api/v1/tickets/${id}`);
+  return requestJson<Ticket>(apiUrl(`/api/v1/tickets/${id}`));
 }
 
 export async function createTicket(input: TicketInput): Promise<Ticket> {
-  const response = await fetch("/api/v1/tickets", {
+  const response = await fetch(apiUrl('/api/v1/tickets'), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
@@ -60,7 +61,7 @@ export async function updateTicketStatus(
   status: Ticket["status"],
 ) {
   const response = await fetch(
-    `/api/v1/tickets/${encodeURIComponent(ticketId)}/status`,
+    apiUrl(`/api/v1/tickets/${encodeURIComponent(ticketId)}/status`),
     {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
