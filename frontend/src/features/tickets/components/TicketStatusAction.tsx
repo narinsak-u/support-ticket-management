@@ -28,6 +28,7 @@ export function TicketStatusAction({
   if (!nextStatus) return null;
 
   function updateStatus() {
+    if (!nextStatus) return;
     mutation.mutate(nextStatus);
   }
 

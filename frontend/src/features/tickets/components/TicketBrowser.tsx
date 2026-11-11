@@ -1,4 +1,4 @@
-import { useTicketBrowser } from "../useTicketBrowser";
+import { useTicketBrowser } from "../hooks/useTicketBrowser";
 import { TicketDetailPanel } from "./TicketDetailPanel";
 import { TicketFilters } from "./TicketFilters";
 import { TicketList } from "./TicketList";

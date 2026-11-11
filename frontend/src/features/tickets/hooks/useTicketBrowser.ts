@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getTicket, listTickets } from "./api/tickets";
+import { getTicket, listTickets } from "../api/tickets";
 
 type UseTicketBrowserOptions = {
   selectedId: string | null;
