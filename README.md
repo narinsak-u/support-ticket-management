@@ -6,8 +6,8 @@
 
 โปรเจกต์นี้สาธิตสถาปัตยกรรม Modular Monolith ร่วมกับ Clean Architecture โดยแบ่งระบบเป็น Module ตามความรับผิดชอบ และจัดโค้ดภายในแต่ละ Module เป็น layer ดังนี้:
 
-- **Presentation (`http/`, controllers):** รับและตรวจสอบ HTTP requests แล้วแปลงผลลัพธ์เป็น HTTP responses
-- **Application (`application/`):** รวม use cases และประสานงานระหว่าง business rules กับ repository หรือ capability contracts
+- **Presentation (`http/`):** เป็น controllers รับและตรวจสอบ HTTP requests แล้วแปลงผลลัพธ์เป็น HTTP responses
+- **Application (`application/`):** รวม use cases และประสานงานระหว่าง business rules กับ repository
 - **Domain (`domain/`):** เก็บ business models, rules
 - **Infrastructure (`infrastructure/`):** เชื่อมต่อระบบภายนอกและ implement persistence adapters เช่น Drizzle กับ PostgreSQL
 
@@ -66,14 +66,14 @@ backend/src/
         ├── application/          # RecordNotification, ListNotifications และ
         │                         # NotificationRecordRepository contract
         ├── contracts/            # NotificationCapability ที่ Ticket เรียกใช้
-        ├── http/                  # NotificationController และ query DTO
+        ├── http/                 # NotificationController และ query DTO
         └── infrastructure/       # DrizzleNotificationRepository
 
 frontend/src/
 ├── app/                          # Providers, dashboard shell และ state ที่ใช้ร่วมกันข้าม feature
 ├── features/
 │   ├── tickets/                  # ฟอร์ม รายการ รายละเอียด ตัวกรอง และการเปลี่ยนสถานะ Ticket
-│   └── notifications/            # API และแผงแสดงกิจกรรม Notification
+│   └── notifications/            # แสดง Notification
 ├── shared/                       # API client, pagination และ UI ที่ใช้ร่วมกัน
 └── style.css                     # สไตล์ของแอป
 ```
@@ -81,7 +81,7 @@ frontend/src/
 **ความรับผิดชอบของแต่ละ Module**
 
 - **Ticket:** บันทึก, เรียกดู และอัพเดตสถานะของ Ticket
-- **Routing:** กำหนดทีมรับผิดชอบตามหมวดหมู่และความสำคัญ โดย `CRITICAL` มีลำดับเหนือหมวดหมู่
+- **Routing:** กำหนดทีมรับผิดชอบตามหมวดหมู่และความสำคัญ
 - **Notification:** บันทึกและเรียกดู Notification records
 
 
@@ -94,14 +94,13 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
-Compose จะเริ่ม PostgreSQL, migration service แบบทำงานครั้งเดียว, Backend และ Vite frontend Backend จะเริ่มหลังฐานข้อมูลพร้อมใช้งานและ migrations ทำงานเสร็จแล้ว หากตาราง Ticket ยังว่าง ระบบจะสร้าง Ticket ตัวอย่าง 5 รายการพร้อม Notification records เมื่อเริ่ม Backend ใหม่จะไม่ seed ซ้ำหากมี Ticket อยู่แล้ว
+Compose จะเริ่ม PostgreSQL, migration service แบบทำงานครั้งเดียว, Backend และ Vite frontend โดย Backend จะเริ่มหลังฐานข้อมูลพร้อมใช้งานหลัง migrations ทำงานเสร็จแล้ว หากตาราง Ticket ยังว่าง จะสร้าง Ticket ตัวอย่าง 5 รายการพร้อม Notification records เมื่อเริ่ม Backend ใหม่จะไม่ seed ซ้ำหากมี Ticket อยู่แล้ว
 
 เปิดใช้งาน:
 
 - Dashboard: <http://localhost:5173>
 - API base: <http://localhost:3000/api/v1>
 - Swagger UI: <http://localhost:3000/api/docs>
-- OpenAPI JSON: <http://localhost:3000/api/docs-json>
 - Health: <http://localhost:3000/health>
 
 
@@ -144,18 +143,20 @@ Business endpoints ใช้ prefix `/api/v1` ยกเว้น `/health`
 | `category = BILLING` | `FINANCE_TEAM` |
 | `category = GENERAL` | `SUPPORT_TEAM` |
 
+**เหตุผล:** ที่กำหนดให้ Ticket ที่มี Priority เป็น CRITICAL ส่งไปยัง INCIDENT_TEAM ก่อน โดยจำลองแนวคิดที่เหตุการณ์รุนแรงต้องได้รับการประสานงานอย่างเร่งด่วน
+
 
 ## AI-Assisted Development
 
-เริ่มจากใช้ ChatGPT ช่วยหาไอเดียและรวบรวม Requirements เบื้องต้น ก่อนสรุปเป็น spec ที่ระบุเป้าหมาย ขอบเขต และสถาปัตยกรรมไว้ใน [`docs/spec.md`](docs/spec.md) (spec คร่าวๆ) จากนั้นใช้ AI coding agent Pi (Oh My Pi) กับโมเดล GPT-6 Sol และ GPT-6 Luna + agent skills เพื่อวางแผน แบ่งงาน และพัฒนาโปรเจกต์ตามแนวทาง Spec-Driven Development โดยมี flow ดังนี้:
+เริ่มจากใช้ ChatGPT ช่วยหาไอเดียและรวบรวม Requirements เบื้องต้น ก่อนสรุปเป็น spec ที่ระบุเป้าหมาย ขอบเขต และสถาปัตยกรรมเป็น spec คร่าวๆ ([`docs/spec.md`](docs/spec.md)) จากนั้นใช้ AI coding agent: Pi (Oh My Pi) กับโมเดล GPT-6 Sol และ Luna + Agent skills เพื่อวางแผน แบ่งงาน และพัฒนาโปรเจกต์ตามแนวทาง Spec-Driven Development โดยมี flow ดังนี้:
 
 - **`grill-me-with-docs`** - ใช้ทบทวน Requirements ด้วยคำถามเพื่อค้นหาข้อกำหนดที่ยังไม่ชัดเจน พร้อมพิจารณาทางเลือกและ trade-offs ก่อนกำหนด scope สำหรับ spec
 - **`to-spec`** - แปลง Requirements เป็น Technical Specification ครอบคลุม Architecture, Module Boundaries และ Acceptance Criteria
 - **`to-tickets`** - แบ่ง spec ออกเป็น Tasks ย่อยๆ ที่มีขอบเขตชัดเจนและลำดับการทำงาน โดยจะเก็บเป็น Issues ที่ [`/.scratch`](/.scratch)
-- **`implement-spec`** - ใช้คู่กับคำสั่ง `orchestrate` ให้ Main Agent กระจาย Tickets ไปยัง Subagents ทำงานบน Integration Branch โดยทุกตัวจะทำงานเป็น TDD และรวมผลลัพธ์
+- **`implement-spec`** - ใช้คู่กับคำสั่ง `orchestrate` ให้ Main Agent กระจาย Tickets ไปยัง Subagents ทำงานบน Integration Branch โดยทุกตัวจะ implement เป็น TDD และรวมผลลัพธ์สุดท้ายกลับมา
 
-จากนั้นจะสั่งให้ตรวจสอบ Implementation เปรียบเทียบกับ Specification ว่าถูกต้องมั้ย, แล้วลองทดสอบและ refactor case by case
+จากนั้นจะสั่งให้ตรวจสอบ Implementation เปรียบเทียบกับ Spec ว่าถูกต้องมั้ย, แล้วลองทดสอบ, และใช้สกิล `to-retro` ช่วยรีวิวและหาส่วนที่ต้องปรับปรุง จากนั้นก็ refactor case by case
 
 ## Limitations
 
-โปรเจกต์นี้เป็น proof of concept: ไม่มี Authentication หรือ Authorization, ไม่มีการส่ง Notification ภายนอก.
+โปรเจกต์นี้เป็น proof of concept: ไม่มี Authentication หรือ Authorization, ไม่มีการส่ง Notification โดยใช้ email หรือ sms service ภายนอก.
