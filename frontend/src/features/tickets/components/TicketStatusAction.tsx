@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { updateTicketStatus } from "../api/tickets";
 import type { Ticket } from "../types";
 
@@ -13,32 +13,23 @@ export function TicketStatusAction({
   status,
   onChanged,
 }: TicketStatusActionProps) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const nextStatus =
     status === "OPEN"
       ? "IN_PROGRESS"
       : status === "IN_PROGRESS"
         ? "RESOLVED"
         : null;
+  const mutation = useMutation({
+    mutationFn: (nextStatus: Ticket["status"]) =>
+      updateTicketStatus(ticketId, nextStatus),
+    onSuccess: onChanged,
+  });
 
   if (!nextStatus) return null;
 
-  async function updateStatus() {
-    setPending(true);
-    setError(null);
-    try {
-      await updateTicketStatus(ticketId, nextStatus!);
-      onChanged();
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Could not update ticket status. Try again.",
-      );
-    } finally {
-      setPending(false);
-    }
+  function updateStatus() {
+    if (!nextStatus) return;
+    mutation.mutate(nextStatus);
   }
 
   return (
@@ -46,16 +37,18 @@ export function TicketStatusAction({
       <button
         className="secondary-button"
         type="button"
-        disabled={pending}
+        disabled={mutation.isPending}
         onClick={updateStatus}
       >
-        {pending
+        {mutation.isPending
           ? "Updating…"
           : `Mark as ${nextStatus.replace("_", " ").toLowerCase()}`}
       </button>
-      {error && (
+      {mutation.error && (
         <p className="request-error" role="alert">
-          {error}
+          {mutation.error instanceof Error
+            ? mutation.error.message
+            : "Could not update ticket status. Try again."}
         </p>
       )}
     </div>
