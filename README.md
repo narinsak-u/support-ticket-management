@@ -1,79 +1,161 @@
 # support-ticket
 
-A locally run support-ticket proof of concept: React dashboard, NestJS modular monolith, and PostgreSQL. Docker Compose builds and starts the app; local Node.js, npm, and PostgreSQL are not required for app startup.
+## Purpose
 
-## Start
+แอปจัดการ Ticket ฝ่ายสนับสนุนลูกค้าสำหรับพิสูจน์แนวคิด - ผู้ใช้สร้าง เรียกดู และเปลี่ยนสถานะ Ticket ได้ ระบบกำหนดทีมรับผิดชอบจากหมวดหมู่และความสำคัญ พร้อมบันทึก Notification เมื่อสร้าง Ticket
 
-Requirements: Docker Engine with the Compose plugin.
+โปรเจกต์นี้สาธิตสถาปัตยกรรม Modular Monolith ร่วมกับ Clean Architecture โดยแบ่งระบบเป็น Module ตามความรับผิดชอบ และจัดโค้ดภายในแต่ละ Module เป็น layer ดังนี้:
+
+- **Presentation (`http/`, controllers):** รับและตรวจสอบ HTTP requests แล้วแปลงผลลัพธ์เป็น HTTP responses
+- **Application (`application/`):** รวม use cases และประสานงานระหว่าง business rules กับ repository หรือ capability contracts
+- **Domain (`domain/`):** เก็บ business models, rules
+- **Infrastructure (`infrastructure/`):** เชื่อมต่อระบบภายนอกและ implement persistence adapters เช่น Drizzle กับ PostgreSQL
+
+## Technology
+
+- **Frontend:** React, TypeScript, Vite, TanStack Query, React Hook Form, Zod
+- **Backend:** NestJS, TypeScript, Swagger
+- **Database:** PostgreSQL 17, Drizzle ORM
+- **Tests:** Vitest, Supertest
+- **Local runtime:** Docker Compose
+
+### เหตุผลที่เลือก
+
+- เนื่องจาก NestJS มีโครงสร้างแบบ Modular และรองรับ Dependency Injection ช่วยแยกความรับผิดชอบและกำหนดขอบเขตของ Business Modules ได้ชัดเจน เหมาะกับการออกแบบ Modular Monolith โดยสามารถเชื่อมต่อโมดูลผ่าน Contracts และแยก Business Logic ออกจากกันตามแนวคิด Clean Architecture ทำให้ระบบทดสอบ บำรุงรักษา และขยายต่อได้ง่าย
+
+## Architecture
+
+React เรียก NestJS API โดยตรง โมดูล Backend สื่อสารกันภายใน process ผ่าน capability และ repository contract
+
+```mermaid
+flowchart LR
+  Browser --> UI[React + Vite]
+  UI -->|REST / JSON| API[NestJS API]
+  subgraph App[NestJS modular monolith]
+    API --> Ticket[โมดูล Ticket]
+    Ticket -->|RoutingCapability| Routing[โมดูล Routing]
+    Ticket -->|NotificationCapability| Notification[โมดูล Notification]
+    Ticket -->|uses| TicketRepo[TicketRepository port]
+    TicketDB -->|implements| TicketRepo
+    Notification -->|uses| NotificationRepo[NotificationRecordRepository port]
+    NotificationDB -->|implements| NotificationRepo
+    TicketDB --> DB[(PostgreSQL)]
+    NotificationDB --> DB
+    Migrate[Drizzle migrations] --> DB
+  end
+```
+
+### Project structure
+
+```text
+backend/src/
+├── app.module.ts                 # ประกอบโมดูล Backend
+├── db/                           # การเชื่อมต่อ PostgreSQL, Drizzle schema และ migrations
+└── modules/
+    ├── ticket/
+    │   ├── domain/               # กฎ การตรวจสอบข้อมูล และการเปลี่ยนสถานะ Ticket
+    │   ├── application/          # use case สำหรับสร้าง ดูรายการ ดูข้อมูล และเปลี่ยนสถานะ;
+    │   │                         # TicketRepository contract
+    │   ├── http/                 # TicketController และ request DTO
+    │   └── infrastructure/       # DrizzleTicketRepository และตัว seed ข้อมูลเมื่อเริ่มระบบ
+    ├── routing/
+    │   ├── domain/               # กฎกำหนดทีมจากหมวดหมู่และความสำคัญ
+    │   ├── application/          # use case DetermineTeam
+    │   └── contracts/            # RoutingCapability ที่ Ticket เรียกใช้
+    └── notification/
+        ├── application/          # RecordNotification, ListNotifications และ
+        │                         # NotificationRecordRepository contract
+        ├── contracts/            # NotificationCapability ที่ Ticket เรียกใช้
+        ├── http/                  # NotificationController และ query DTO
+        └── infrastructure/       # DrizzleNotificationRepository
+
+frontend/src/
+├── app/                          # Providers, dashboard shell และ state ที่ใช้ร่วมกันข้าม feature
+├── features/
+│   ├── tickets/                  # ฟอร์ม รายการ รายละเอียด ตัวกรอง และการเปลี่ยนสถานะ Ticket
+│   └── notifications/            # API และแผงแสดงกิจกรรม Notification
+├── shared/                       # API client, pagination และ UI ที่ใช้ร่วมกัน
+└── style.css                     # สไตล์ของแอป
+```
+
+**ความรับผิดชอบของแต่ละ Module**
+
+- **Ticket:** บันทึก, เรียกดู และอัพเดตสถานะของ Ticket
+- **Routing:** กำหนดทีมรับผิดชอบตามหมวดหมู่และความสำคัญ โดย `CRITICAL` มีลำดับเหนือหมวดหมู่
+- **Notification:** บันทึกและเรียกดู Notification records
+
+
+## Setup
 
 ```sh
+# ไม่บังคับ: คัดลอกค่าเริ่มต้น แล้วแก้ไขค่าใน .env
+cp .env.example .env
+
 docker compose up --build -d
 ```
 
-Compose starts four services: `db`, `migrate`, `backend`, and `frontend`. The migration service applies pending Drizzle migrations before the backend starts. PostgreSQL data lives in the named `postgres_data` volume and survives container recreation.
+Compose จะเริ่ม PostgreSQL, migration service แบบทำงานครั้งเดียว, Backend และ Vite frontend Backend จะเริ่มหลังฐานข้อมูลพร้อมใช้งานและ migrations ทำงานเสร็จแล้ว หากตาราง Ticket ยังว่าง ระบบจะสร้าง Ticket ตัวอย่าง 5 รายการพร้อม Notification records เมื่อเริ่ม Backend ใหม่จะไม่ seed ซ้ำหากมี Ticket อยู่แล้ว
+
+เปิดใช้งาน:
 
 - Dashboard: <http://localhost:5173>
-- API: <http://localhost:3000/api/v1>
+- API base: <http://localhost:3000/api/v1>
 - Swagger UI: <http://localhost:3000/api/docs>
 - OpenAPI JSON: <http://localhost:3000/api/docs-json>
 - Health: <http://localhost:3000/health>
 
-Both published ports bind to `127.0.0.1`. This unauthenticated demo is not safe for public exposure.
 
-## Separate frontend and API
+### Environment variables `.env`:
 
-The frontend runs the Vite development server in its container and calls the backend directly. Copy `.env.example` to `.env` to override:
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `POSTGRES_PASSWORD` | `support_ticket` | รหัสผ่าน PostgreSQL สำหรับเครื่อง local |
+| `VITE_API_URL` | `http://localhost:3000` | Origin ของ Backend |
+| `CORS_ORIGIN` | `http://localhost:5173,http://127.0.0.1:5173` | รายการ origin ของ frontend |
 
-- `VITE_API_URL`: backend origin used by the frontend. Default: `http://localhost:3000`.
-- `CORS_ORIGIN`: comma-separated frontend origins allowed by the backend. Defaults to `http://localhost:5173` and `http://127.0.0.1:5173`.
+## API endpoints
 
-Restart the frontend after changing `VITE_API_URL`: `docker compose up -d frontend`. For separate deployments, set `VITE_API_URL` to the public backend origin and `CORS_ORIGIN` to the frontend origin. CORS origins are origins only: scheme, host, and optional port; no path. Vite's development server is for this local proof of concept, not production hosting.
+Business endpoints ใช้ prefix `/api/v1` ยกเว้น `/health`
 
-Example: create a ticket through the API.
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/v1/tickets` | สร้าง Ticket; body มี `title`, `description`, `category` และ `priority` |
+| `GET` | `/api/v1/tickets?page=1&limit=5` | แสดงรายการ Ticket; กรองด้วย `status` และ `category` ได้ |
+| `GET` | `/api/v1/tickets/{id}` | ดู Ticket รายการเดียว |
+| `PATCH` | `/api/v1/tickets/{id}/status` | เปลี่ยนสถานะด้วย `{"status":"IN_PROGRESS"}` หรือ `{"status":"RESOLVED"}` |
+| `GET` | `/api/v1/notifications?page=1&limit=5` | แสดงรายการ Notification records |
+| `GET` | `/health` | ตรวจสอบสถานะ Backend |
 
-```sh
-curl -X POST http://localhost:3000/api/v1/tickets \
-  -H 'content-type: application/json' \
-  -d '{"title":"Cannot sign in","description":"Login fails","category":"TECHNICAL","priority":"HIGH"}'
-```
 
-## Stop
+### ค่าที่รองรับ
 
-```sh
-docker compose down
-```
+- **หมวดหมู่ Ticket:** `TECHNICAL`, `BILLING`, `GENERAL`
+- **ระดับความสำคัญ:** `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`
+- **รหัสทีม (`TEAM_CODES`):** `INCIDENT_TEAM`, `ENGINEERING_TEAM`, `FINANCE_TEAM`, `SUPPORT_TEAM`
+- **สถานะ:** Ticket เริ่มที่ `OPEN` และเปลี่ยนได้ตามลำดับ `OPEN` → `IN_PROGRESS` → `RESOLVED` เท่านั้น ไม่อนุญาตให้ข้ามขั้นหรือย้อนกลับ
 
-This stops and removes containers and networks. It keeps `postgres_data`. To remove the database and permanently erase its stored tickets and notification records:
+### นโยบายกำหนดทีม
 
-```sh
-docker compose down --volumes
-```
+ตรวจสอบ `priority` ก่อน `category` หากเป็น `CRITICAL` จะกำหนด `INCIDENT_TEAM` โดยไม่ขึ้นกับหมวดหมู่:
 
-**Warning:** `--volumes` permanently deletes the Compose database volume and all data in it.
+| เงื่อนไข | ทีมที่ได้รับมอบหมาย |
+| --- | --- |
+| `category = TECHNICAL` | `ENGINEERING_TEAM` |
+| `category = BILLING` | `FINANCE_TEAM` |
+| `category = GENERAL` | `SUPPORT_TEAM` |
 
-## Tests
 
-Tests are optional for running the Docker application. Host-side backend tests need Node.js/npm and install backend dependencies:
+## AI-Assisted Development
 
-```sh
-cd backend && npm ci && npm test
-```
+เริ่มจากใช้ ChatGPT ช่วยหาไอเดียและรวบรวม Requirements เบื้องต้น ก่อนสรุปเป็น spec ที่ระบุเป้าหมาย ขอบเขต และสถาปัตยกรรมไว้ใน [`docs/spec.md`](docs/spec.md) (spec คร่าวๆ) จากนั้นใช้ AI coding agent Pi (Oh My Pi) กับโมเดล GPT-6 Sol และ GPT-6 Luna + agent skills เพื่อวางแผน แบ่งงาน และพัฒนาโปรเจกต์ตามแนวทาง Spec-Driven Development โดยมี flow ดังนี้:
 
-Or run the backend tests with Docker alone (the build stage includes development dependencies):
+- **`grill-me-with-docs`** - ใช้ทบทวน Requirements ด้วยคำถามเพื่อค้นหาข้อกำหนดที่ยังไม่ชัดเจน พร้อมพิจารณาทางเลือกและ trade-offs ก่อนกำหนด scope สำหรับ spec
+- **`to-spec`** - แปลง Requirements เป็น Technical Specification ครอบคลุม Architecture, Module Boundaries และ Acceptance Criteria
+- **`to-tickets`** - แบ่ง spec ออกเป็น Tasks ย่อยๆ ที่มีขอบเขตชัดเจนและลำดับการทำงาน โดยจะเก็บเป็น Issues ที่ [`/.scratch`](/.scratch)
+- **`implement-spec`** - ใช้คู่กับคำสั่ง `orchestrate` ให้ Main Agent กระจาย Tickets ไปยัง Subagents ทำงานบน Integration Branch โดยทุกตัวจะทำงานเป็น TDD และรวมผลลัพธ์
 
-```sh
-docker build --target build -f backend/Dockerfile -t support-ticket-tests .
-docker run --rm support-ticket-tests npm test
-```
+จากนั้นจะสั่งให้ตรวจสอบ Implementation เปรียบเทียบกับ Specification ว่าถูกต้องมั้ย, แล้วลองทดสอบและ refactor case by case
 
-The fresh-database integration smoke script needs Docker, Bash, and `curl`, not host Node.js/PostgreSQL:
+## Limitations
 
-```sh
-bash scripts/integration-smoke.sh
-```
-
-## Boundaries and limitations
-
-See [architecture](docs/architecture.md) for module responsibilities, contracts, and manual boundary inspection; [decisions](docs/decisions.md) for the six ADRs; [demo walkthrough](docs/demo-script.md); and [AI development log](docs/ai-development-log.md).
-
-This is a proof of concept, not a production service. It has no authentication or authorization, sends no email/SMS/push messages, and does not guarantee durable notification delivery. A crash after ticket commit can leave no notification record. See [architecture decisions](docs/decisions.md#adr-006-no-authentication-in-mvp).
+โปรเจกต์นี้เป็น proof of concept: ไม่มี Authentication หรือ Authorization, ไม่มีการส่ง Notification ภายนอก.
