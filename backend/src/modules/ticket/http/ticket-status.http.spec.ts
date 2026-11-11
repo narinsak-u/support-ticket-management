@@ -5,9 +5,13 @@ import request = require('supertest');
 import { describe, expect, it } from 'vitest';
 import { HttpErrorFilter } from '../../../common/http-exception.filter';
 import { Ticket } from '../domain/ticket';
-import { TicketStatusRepository, UpdateTicketStatus } from '../application/update-status';
+import { UpdateTicketStatus } from '../application/update-status';
+import type { TicketRepository } from '../application/ticket-repository';
+import { CreateTicket } from '../application/create-ticket';
+import { GetTicket } from '../application/get-ticket';
+import { ListTickets } from '../application/list-tickets';
 import { StatusUpdateDto } from './status-update.dto';
-import { TicketStatusController } from './status.controller';
+import { TicketController } from './ticket.controller';
 
 const id = '7f7c1b7e-8a3d-4f93-9aca-2c3d7a4d5c01';
 
@@ -17,7 +21,9 @@ async function createApp() {
       priority: 'HIGH', status: 'OPEN', assignedTeamCode: 'ENGINEERING_TEAM', createdAt: new Date('2026-01-01T00:00:00Z') }),
     concurrent: false,
   };
-  const repository: TicketStatusRepository = {
+  const repository: TicketRepository = {
+    save: async () => {},
+    list: async () => ({ tickets: [], total: 0 }),
     findById: async (ticketId) => ticketId === id ? state.ticket : undefined,
     updateStatus: async (updated, expected) => {
       if (state.concurrent) {
@@ -29,10 +35,15 @@ async function createApp() {
       return true;
     },
   };
-  Reflect.defineMetadata('design:paramtypes', [String, StatusUpdateDto], TicketStatusController.prototype, 'update');
+  Reflect.defineMetadata('design:paramtypes', [String, StatusUpdateDto], TicketController.prototype, 'updateStatusForTicket');
   const module = await Test.createTestingModule({
-    controllers: [TicketStatusController],
-    providers: [{ provide: UpdateTicketStatus, useValue: new UpdateTicketStatus(repository) }],
+    controllers: [TicketController],
+    providers: [
+      { provide: CreateTicket, useValue: { execute: async () => undefined } },
+      { provide: ListTickets, useValue: { execute: async () => ({ data: [], pagination: { page: 1, limit: 5, total: 0 } }) } },
+      { provide: GetTicket, useValue: { execute: async () => undefined } },
+      { provide: UpdateTicketStatus, useValue: new UpdateTicketStatus(repository) },
+    ],
   }).compile();
   const app = module.createNestApplication();
   app.setGlobalPrefix('api/v1');

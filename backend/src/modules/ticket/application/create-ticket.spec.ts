@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { NotificationCapability } from '../../notification/contracts/notification.contract';
 import type { RoutingCapability, RoutingDecision } from '../../routing/contracts/routing.contract';
-import { CreateTicket, TicketRepository } from './create-ticket';
+import { CreateTicket } from './create-ticket';
+import type { TicketRepository } from './ticket-repository';
 
 const input = { title: 'Cannot sign in', description: '', category: 'TECHNICAL', priority: 'HIGH' } as const;
 const logger = { error: vi.fn() };
@@ -13,6 +14,7 @@ function setup(teamCode: RoutingDecision['teamCode'] = 'ENGINEERING_TEAM') {
     save: vi.fn().mockResolvedValue(undefined),
     list: vi.fn().mockResolvedValue({ tickets: [], total: 0 }),
     findById: vi.fn().mockResolvedValue(undefined),
+    updateStatus: async () => true,
   };
   return { useCase: new CreateTicket(tickets, routing, notifications, logger), routing, notifications, tickets };
 }

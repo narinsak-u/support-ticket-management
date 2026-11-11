@@ -6,7 +6,11 @@ import { describe, expect, it } from 'vitest';
 import { HttpErrorFilter } from '../../../common/http-exception.filter';
 import { DetermineTeam } from '../../routing/application/determine-team';
 import { Ticket } from '../domain/ticket';
-import { CreateTicket, GetTicket, ListTicketQuery, ListTickets, TicketRepository } from '../application/create-ticket';
+import { CreateTicket } from '../application/create-ticket';
+import { GetTicket } from '../application/get-ticket';
+import { ListTickets } from '../application/list-tickets';
+import type { ListTicketQuery, TicketRepository } from '../application/ticket-repository';
+import { UpdateTicketStatus } from '../application/update-status';
 import { CreateTicketDto } from './create-ticket.dto';
 import { ListQueryDto } from './list-query.dto';
 import { TicketController } from './ticket.controller';
@@ -22,6 +26,7 @@ function createApp() {
       return { tickets: matches.slice((page - 1) * limit, page * limit), total: matches.length };
     },
     findById: async (id) => persisted.find((ticket) => ticket.id === id),
+    updateStatus: async () => true,
   };
   const createTicket = new CreateTicket(
     repository,
@@ -38,6 +43,7 @@ function createApp() {
       { provide: CreateTicket, useValue: createTicket },
       { provide: ListTickets, useValue: new ListTickets(repository) },
       { provide: GetTicket, useValue: new GetTicket(repository) },
+      { provide: UpdateTicketStatus, useValue: { execute: async () => undefined } },
     ],
   }).compile().then(async (module) => {
     const app = module.createNestApplication();

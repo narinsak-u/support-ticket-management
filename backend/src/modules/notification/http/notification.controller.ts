@@ -1,6 +1,6 @@
 import { Controller, Get, Inject, Query } from '@nestjs/common';
 import { ApiBadRequestResponse, ApiInternalServerErrorResponse, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { ListNotifications } from '../application/record-notification';
+import { ListNotifications } from '../application/list-notifications';
 import { ErrorEnvelopeDto, NotificationListResponseDto } from '../../../common/http-response.dto';
 import { NotificationListQueryDto } from './notification-list-query.dto';
 

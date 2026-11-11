@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { CreateTicket, ListTickets } from '../application/create-ticket';
+import { CreateTicket } from '../application/create-ticket';
+import { ListTickets } from '../application/list-tickets';
 
 const SAMPLE_TICKETS = [
   { title: 'Cannot sign in to my account', description: 'Password reset link has expired.', category: 'TECHNICAL', priority: 'HIGH' },

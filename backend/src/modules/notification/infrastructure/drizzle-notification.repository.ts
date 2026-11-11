@@ -4,7 +4,7 @@ import { drizzle, NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 import { DATABASE_POOL } from '../../../db/database.module';
 import { notificationRecords } from '../../../db/schema';
-import { NotificationListQuery, NotificationRecord, NotificationRecordRepository } from '../application/record-notification';
+import { NotificationListQuery, NotificationRecord, NotificationRecordRepository } from '../application/notification-record-repository';
 
 const notificationSchema = { notificationRecords };
 

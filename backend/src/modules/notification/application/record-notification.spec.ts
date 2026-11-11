@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  NotificationRecordRepository,
-  RecordNotification,
-} from './record-notification';
+import { RecordNotification } from './record-notification';
+import type { NotificationRecordRepository } from './notification-record-repository';
 
 describe('RecordNotification', () => {
   it('stores the ticket creation assignment with an ID and timestamp', async () => {

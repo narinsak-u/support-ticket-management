@@ -1,9 +1,5 @@
 import { Ticket, TicketStatus } from '../domain/ticket';
-
-export interface TicketStatusRepository {
-  findById(id: string): Promise<Ticket | undefined>;
-  updateStatus(ticket: Ticket, expectedStatus: TicketStatus): Promise<boolean>;
-}
+import type { TicketRepository } from './ticket-repository';
 
 export class TicketStatusUseCaseError extends Error {
   constructor(readonly code: 'NOT_FOUND' | 'CONFLICT', message: string) {
@@ -12,7 +8,7 @@ export class TicketStatusUseCaseError extends Error {
 }
 
 export class UpdateTicketStatus {
-  constructor(private readonly tickets: TicketStatusRepository) {}
+  constructor(private readonly tickets: TicketRepository) {}
 
   async execute(id: string, status: TicketStatus): Promise<Ticket> {
     const current = await this.tickets.findById(id);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Ticket, TicketStatus } from '../domain/ticket';
-import { UpdateTicketStatus, TicketStatusRepository } from './update-status';
+import { UpdateTicketStatus } from './update-status';
+import type { TicketRepository } from './ticket-repository';
 
 const ticket = (status: TicketStatus) => Ticket.reconstitute({
   id: '7f7c1b7e-8a3d-4f93-9aca-2c3d7a4d5c01', title: 'Cannot sign in', description: '',
@@ -10,7 +11,12 @@ const ticket = (status: TicketStatus) => Ticket.reconstitute({
 const id = '7f7c1b7e-8a3d-4f93-9aca-2c3d7a4d5c01';
 
 function setup(initial?: Ticket, update = async () => true) {
-  const repository: TicketStatusRepository = { findById: async () => initial, updateStatus: update };
+  const repository: TicketRepository = {
+    save: async () => {},
+    list: async () => ({ tickets: [], total: 0 }),
+    findById: async () => initial,
+    updateStatus: update,
+  };
   return new UpdateTicketStatus(repository);
 }
 

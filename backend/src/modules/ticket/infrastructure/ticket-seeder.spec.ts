@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { NotificationCapability } from '../../notification/contracts/notification.contract';
 import type { RoutingCapability } from '../../routing/contracts/routing.contract';
-import { CreateTicket, ListTickets, TicketRepository } from '../application/create-ticket';
+import { CreateTicket } from '../application/create-ticket';
+import { ListTickets } from '../application/list-tickets';
+import type { TicketRepository } from '../application/ticket-repository';
 import { TicketSeeder } from './ticket-seeder';
 
 describe('TicketSeeder', () => {
@@ -10,6 +12,7 @@ describe('TicketSeeder', () => {
       save: vi.fn().mockResolvedValue(undefined),
       list: vi.fn().mockResolvedValue({ tickets: [], total }),
       findById: vi.fn().mockResolvedValue(undefined),
+      updateStatus: vi.fn().mockResolvedValue(true),
     };
     const routing: RoutingCapability = { determineTeam: vi.fn().mockResolvedValue({ teamCode: 'SUPPORT_TEAM', reason: 'test' }) };
     const notifications: NotificationCapability = { recordTicketCreated: vi.fn().mockResolvedValue(undefined) };

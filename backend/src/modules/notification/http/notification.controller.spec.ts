@@ -4,7 +4,8 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { HttpErrorFilter } from '../../../common/http-exception.filter';
-import { ListNotifications, NotificationRecordRepository } from '../application/record-notification';
+import { ListNotifications } from '../application/list-notifications';
+import type { NotificationRecordRepository } from '../application/notification-record-repository';
 import { NotificationController } from './notification.controller';
 import { NotificationListQueryDto } from './notification-list-query.dto';
 
